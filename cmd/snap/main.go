@@ -15,7 +15,7 @@ func main() {
 	app := &cli.Command{
 		Name:    "snap",
 		Usage:   "Concatenate readable source/text files into one snapshot file.",
-		Version: version.Version,
+		Version: version.String(),
 		UsageText: `snap [OPTIONS] [DIRECTORY]
 
 Concatenates readable source/text files into one snapshot file.

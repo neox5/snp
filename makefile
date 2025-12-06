@@ -17,9 +17,13 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 LDFLAGS := -X '$(MODULE_PATH)/internal/version.Version=$(VERSION)'
 
-.PHONY: all build build-local clean print-version
+.PHONY: all build build-local clean print-version release
 
 all: build
+
+# ---------------------------------------------------------------------
+# Multi-platform release build + checksums
+# ---------------------------------------------------------------------
 
 build: clean
 	@mkdir -p "$(DIST_DIR)"
@@ -36,11 +40,23 @@ build: clean
 		( cd "$(DIST_DIR)" && sha256sum "$$file" > "$$file.sha256" ); \
 	done
 
-# Local build for current platform (useful during development)
+# ---------------------------------------------------------------------
+# Local development build
+# ---------------------------------------------------------------------
+
 build-local:
 	@mkdir -p "$(DIST_DIR)"
 	@echo "building $(DIST_DIR)/$(BINARY) (VERSION=$(VERSION))"
 	go build -ldflags "$(LDFLAGS)" -o "$(DIST_DIR)/$(BINARY)" $(CMD_PKG)
+
+# ---------------------------------------------------------------------
+# Full release verification (tag, tests, binaries, checksums)
+# ---------------------------------------------------------------------
+
+release:
+	@./scripts/release.sh
+
+# ---------------------------------------------------------------------
 
 print-version:
 	@echo $(VERSION)
