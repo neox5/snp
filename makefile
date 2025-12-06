@@ -29,10 +29,11 @@ build: clean
 		ext=""; \
 		[ "$$GOOS" = "windows" ] && ext=".exe"; \
 		out="$(DIST_DIR)/$(BINARY)-$${GOOS}-$${GOARCH}$${ext}"; \
+		file=$$(basename "$$out"); \
 		echo "building $$out (VERSION=$(VERSION))"; \
 		GOOS=$$GOOS GOARCH=$$GOARCH go build -ldflags "$(LDFLAGS)" -o "$$out" $(CMD_PKG); \
-		echo "sha256sum $$out > $$out.sha256"; \
-		sha256sum "$$out" > "$$out.sha256"; \
+		echo "generating $$file.sha256"; \
+		( cd "$(DIST_DIR)" && sha256sum "$$file" > "$$file.sha256" ); \
 	done
 
 # Local build for current platform (useful during development)
