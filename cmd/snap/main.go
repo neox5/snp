@@ -8,12 +8,14 @@ import (
 	cli "github.com/urfave/cli/v3"
 
 	"github.com/neox5/snap/internal/snapshot"
+	"github.com/neox5/snap/internal/version"
 )
 
 func main() {
 	app := &cli.Command{
-		Name:  "snap",
-		Usage: "Concatenate readable source/text files into one snapshot file.",
+		Name:    "snap",
+		Usage:   "Concatenate readable source/text files into one snapshot file.",
+		Version: version.Version,
 		UsageText: `snap [OPTIONS] [DIRECTORY]
 
 Concatenates readable source/text files into one snapshot file.
