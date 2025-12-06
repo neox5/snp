@@ -3,14 +3,17 @@ set -euo pipefail
 
 # Post-release verification script (latest release only).
 #
+# - Uses latest GitHub release
 # - Auto-detects OS and ARCH
-# - Downloads latest binary + checksum
+# - Downloads binary + checksum into a temp directory
 # - Verifies SHA256
-# - Compares version with locally installed snap
-# - Fails if versions differ
+# - Verifies the binary runs and reports a valid version
+# - Automatically deletes the temp directory after execution
 #
 # Usage:
-#   scripts/post-release.sh
+#   make post-release
+#   or
+#   ./scripts/post-release.sh
 
 BINARY="snap"
 OWNER_REPO="neox5/snap"
@@ -23,15 +26,6 @@ fail() {
 info() {
   echo "==> $1"
 }
-
-# --- Ensure local snap exists -----------------------------------------------
-
-command -v snap >/dev/null 2>&1 || fail "local 'snap' not found in PATH"
-
-LOCAL_RAW="$(snap --version)"
-LOCAL_VERSION="${LOCAL_RAW##* }"
-
-info "local version:  $LOCAL_VERSION"
 
 # --- Detect OS ---------------------------------------------------------------
 
@@ -63,9 +57,7 @@ case "$uname_m" in
 esac
 
 EXT=""
-if [ "$OS" = "windows" ]; then
-  EXT=".exe"
-fi
+[ "$OS" = "windows" ] && EXT=".exe"
 
 FILE="${BINARY}-${OS}-${ARCH}${EXT}"
 SUM_FILE="${FILE}.sha256"
@@ -76,7 +68,11 @@ info "os:    $OS"
 info "arch:  $ARCH"
 info "file:  $FILE"
 
+# --- Temporary workspace ----------------------------------------------------
+
 TEMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
 info "working directory: $TEMP_DIR"
 cd "$TEMP_DIR"
 
@@ -93,20 +89,19 @@ curl -fL -o "$SUM_FILE" "${BASE_URL}/${SUM_FILE}"
 info "verifying checksum"
 sha256sum -c "$SUM_FILE"
 
-# --- Version compare --------------------------------------------------------
+# --- Version check ----------------------------------------------------------
 
 info "running downloaded binary"
 chmod +x "$FILE"
-DOWNLOADED_RAW="./$FILE --version"
-DOWNLOADED_RAW="$("./$FILE" --version)"
-DOWNLOADED_VERSION="${DOWNLOADED_RAW##* }"
+RAW_VERSION="$("./$FILE" --version)"
+DOWNLOADED_VERSION="${RAW_VERSION##* }"
 
 info "downloaded version: $DOWNLOADED_VERSION"
 
-if [ "$DOWNLOADED_VERSION" != "$LOCAL_VERSION" ]; then
-  fail "version mismatch: local=$LOCAL_VERSION downloaded=$DOWNLOADED_VERSION"
+if [[ ! "$DOWNLOADED_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  fail "downloaded binary returned invalid version: $RAW_VERSION"
 fi
 
 echo
 echo "✅ Post-release verification successful"
-echo "✅ Local and latest versions match: $LOCAL_VERSION"
+echo "✅ Latest binary is valid: $DOWNLOADED_VERSION"

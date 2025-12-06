@@ -17,7 +17,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 LDFLAGS := -X '$(MODULE_PATH)/internal/version.Version=$(VERSION)'
 
-.PHONY: all build build-local clean print-version release
+.PHONY: all build build-local clean print-version release post-release
 
 all: build
 
@@ -55,6 +55,13 @@ build-local:
 
 release:
 	@./scripts/release.sh
+
+# ---------------------------------------------------------------------
+# Post-release verification against GitHub latest
+# ---------------------------------------------------------------------
+
+post-release:
+	@./scripts/post-release.sh
 
 # ---------------------------------------------------------------------
 
