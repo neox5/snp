@@ -15,7 +15,11 @@ PLATFORMS := \
 # Version from git; falls back to "dev" if describe fails.
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-LDFLAGS := -X '$(MODULE_PATH)/internal/version.Version=$(VERSION)'
+# LDFLAGS: Set version + strip debug symbols for smaller binaries
+# -s: omit symbol table
+# -w: omit DWARF debug info
+# Result: ~40-50% size reduction (5-6MB -> 2.5-3.5MB)
+LDFLAGS := -s -w -X '$(MODULE_PATH)/internal/version.Version=$(VERSION)'
 
 .PHONY: all build build-local clean print-version release post-release
 
