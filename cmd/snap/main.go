@@ -42,6 +42,14 @@ If DIRECTORY is omitted, '.' is used.`,
 				Name:  "dry-run",
 				Usage: "Print files that would be included without creating output",
 			},
+			&cli.StringSliceFlag{
+				Name:  "force-text",
+				Usage: "Force files matching glob pattern to be treated as text (repeatable)",
+			},
+			&cli.StringSliceFlag{
+				Name:  "force-binary",
+				Usage: "Force files matching glob pattern to be treated as binary (repeatable)",
+			},
 		},
 		ArgsUsage: "[DIRECTORY]",
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -51,14 +59,15 @@ If DIRECTORY is omitted, '.' is used.`,
 			}
 
 			cfg := snapshot.Config{
-				SourceDir:       sourceDir,
-				OutputPath:      c.String("output"),
-				IncludePatterns: c.StringSlice("include"),
-				ExcludePatterns: c.StringSlice("exclude"),
-				IncludeGitLog:   !c.Bool("exclude-git-log"),
-				DryRun:          c.Bool("dry-run"),
-				// Was the flag explicitly set?
-				OutputExplicit: c.IsSet("output"),
+				SourceDir:           sourceDir,
+				OutputPath:          c.String("output"),
+				IncludePatterns:     c.StringSlice("include"),
+				ExcludePatterns:     c.StringSlice("exclude"),
+				IncludeGitLog:       !c.Bool("exclude-git-log"),
+				DryRun:              c.Bool("dry-run"),
+				OutputExplicit:      c.IsSet("output"),
+				ForceTextPatterns:   c.StringSlice("force-text"),
+				ForceBinaryPatterns: c.StringSlice("force-binary"),
 			}
 
 			return snapshot.Run(ctx, cfg)

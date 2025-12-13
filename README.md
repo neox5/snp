@@ -65,6 +65,32 @@ snap --include "**/*.go" --include "**/*.md"    # Multiple include patterns
 3. `.gitignore` patterns
 4. Default excludes (node_modules/, .git/, dist/, etc.)
 
+### Binary File Handling
+
+Binary files are automatically detected and excluded from content output:
+
+```bash
+# Binary files show size metadata instead of content
+# logo.png
+[Binary file - 45.2 KB - content omitted]
+```
+
+**Override binary detection:**
+
+```bash
+snap --force-text "**/.env"              # Force .env files to be treated as text
+snap --force-binary "**/*.dat"           # Force .dat files to be treated as binary
+snap --force-text "**/*.config" --force-binary "data/secret.config"
+# Multiple patterns (force-binary always wins in conflicts)
+```
+
+**Detection behavior:**
+
+- Empty files are treated as binary
+- Content-based detection using MIME types and null byte checking
+- Common text formats (JSON, XML, YAML, source code) automatically detected
+- `--force-binary` takes precedence over `--force-text` (safer default)
+
 ## How It Works
 
 ### What Gets Included
@@ -72,14 +98,15 @@ snap --include "**/*.go" --include "**/*.md"    # Multiple include patterns
 - All text files not matching exclude patterns
 - Git log (if `.git/` exists, unless `--exclude-git-log` is used)
 - Files matching `--include` patterns override .gitignore
+- Files forced as text via `--force-text`
 
 ### What Gets Excluded
 
 - Directories: `.git/`, `node_modules/`, `.venv/`, `dist/`, `build/`, `target/`, `vendor/`
 - Patterns: `*.log`, `*.tmp`, `**/snap.txt`
 - Files in your `.gitignore`
-- Binary files (shown as `[Binary file - content omitted]`)
-- Files matching `--exclude` patterns
+- Binary files (detected automatically or via `--force-binary`)
+- Empty files (treated as binary)
 
 ### Output Format
 
@@ -94,18 +121,25 @@ snap --include "**/*.go" --include "**/*.md"    # Multiple include patterns
 package main
 ...
 
+# logo.png
+[Binary file - 45.2 KB - content omitted]
+
 # internal/snapshot/snapshot.go
 package snapshot
 ...
 ```
 
-Each file section starts with `# relative/path/from/root` followed by the file contents.
+Each file section starts with `# relative/path/from/root` followed by either:
+
+- File contents (for text files)
+- Binary file metadata with size (for binary files)
 
 ### Safety Features
 
 - Default `./snap.txt` always overwrites (safe for repeated runs)
 - Custom output paths require explicit `--output` flag to overwrite existing files
 - Output file automatically excluded from snapshot (prevents recursion)
+- Binary files excluded by default to prevent corruption
 
 ## Installation
 
@@ -203,6 +237,19 @@ snap --output docs-snapshot.txt --include "docs/**" --include "*.md"
 snap --exclude-git-log
 ```
 
+### Force specific file types
+
+```bash
+# Force .env files to be treated as text (normally detected as binary)
+snap --force-text "**/.env" --force-text "**/.editorconfig"
+
+# Force .dat files to be binary (even if they contain text)
+snap --force-binary "**/*.dat"
+
+# Combine with other filters
+snap --include "config/**" --force-text "**/.env"
+```
+
 ### Verify filtering before snapshot
 
 ```bash
@@ -211,6 +258,19 @@ snap --dry-run --exclude "**/*_test.go"
 
 # If satisfied, create the snapshot
 snap --exclude "**/*_test.go"
+```
+
+### Handle edge cases with force flags
+
+```bash
+# Custom binary format that looks like text
+snap --force-binary "**/*.myformat"
+
+# Text file with unusual extension
+snap --force-text "data/config.bin"
+
+# Force takes precedence over detection
+snap --force-text "**/*.log"  # Include log files as text
 ```
 
 ## Release
@@ -250,4 +310,4 @@ The `post-release` script will:
 
 ## License
 
-MIT License â€” see [LICENSE](LICENSE) file for details.
+MIT License – see [LICENSE](LICENSE) file for details.

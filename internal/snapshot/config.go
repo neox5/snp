@@ -2,12 +2,13 @@ package snapshot
 
 // Config holds the runtime configuration for a snapshot run.
 type Config struct {
-	SourceDir       string
-	OutputPath      string
-	IncludePatterns []string
-	ExcludePatterns []string
-	IncludeGitLog   bool
-	DryRun          bool
-	// OutputExplicit indicates if --output was explicitly set.
-	OutputExplicit bool
+	SourceDir           string
+	OutputPath          string
+	IncludePatterns     []string
+	ExcludePatterns     []string
+	IncludeGitLog       bool
+	DryRun              bool
+	OutputExplicit      bool
+	ForceTextPatterns   []string
+	ForceBinaryPatterns []string
 }
