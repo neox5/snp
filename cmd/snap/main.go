@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -70,7 +71,35 @@ If DIRECTORY is omitted, '.' is used.`,
 				ForceBinaryPatterns: c.StringSlice("force-binary"),
 			}
 
-			return snapshot.Run(ctx, cfg)
+			absSourceDir, absOutput, err := snapshot.ValidateAndResolve(cfg)
+			if err != nil {
+				return err
+			}
+
+			snap, err := snapshot.Build(ctx, cfg, absSourceDir, absOutput)
+			if err != nil {
+				return err
+			}
+
+			if cfg.DryRun {
+				for _, f := range snap.Files {
+					fmt.Println(f.RelPath)
+				}
+				return nil
+			}
+
+			outFile, err := os.Create(absOutput)
+			if err != nil {
+				return fmt.Errorf("cannot create output file %q: %w", absOutput, err)
+			}
+			defer outFile.Close()
+
+			if err := snap.WriteTo(outFile); err != nil {
+				return err
+			}
+
+			fmt.Printf("Files concatenated to %s\n", absOutput)
+			return nil
 		},
 	}
 

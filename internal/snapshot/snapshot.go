@@ -1,239 +1,142 @@
-// Package snapshot orchestrates directory traversal, ignore rules, optional
-// Git log inclusion, and writing the final snapshot file.
 package snapshot
 
 import (
-	"bufio"
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
+	"io"
 
+	"github.com/neox5/snap/internal/file"
 	"github.com/neox5/snap/internal/gitlog"
-	"github.com/neox5/snap/internal/ignore"
+	"github.com/neox5/snap/internal/writer"
 )
 
-// calculateStartLines computes the StartLine field for each file in the snapshot.
-// This must be called after we know:
-// - gitLogLines (how many lines the git log section takes)
-// - len(files) (how many files we have)
-//
-// Note: This function calculates line numbers for where files will appear
-// in the final output, which includes the Files list section that hasn't
-// been written yet when this function is called.
-// StartLine points to the first content line (after the "# filename" header).
-func calculateStartLines(files []FileInfo, gitLogLines int) {
-	currentLine := 1
+// Snapshot represents the complete snapshot data
+type Snapshot struct {
+	GitLogLines GitLogLines
+	Files       []*file.File
+	Layout      []Content
+}
 
-	// Git log section (if present)
-	if gitLogLines > 0 {
-		currentLine += gitLogLines
+// GitLogLines represents git log output
+type GitLogLines []string
+
+// Build creates a complete snapshot
+func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput string) (*Snapshot, error) {
+	snap := &Snapshot{}
+
+	// Collect git log if enabled
+	if cfg.IncludeGitLog && gitlog.HasRepo(absSourceDir) {
+		gitLogData, err := gitlog.Collect(ctx, absSourceDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to collect git log: %w", err)
+		}
+		snap.GitLogLines = gitLogData.Lines
 	}
 
-	// Files list section (that will be written after this calculation)
-	currentLine++             // "# Files" header
-	currentLine += len(files) // one line per file in the list
-	currentLine += 3          // blank line + separator + blank line
+	// Collect files
+	discovered, err := file.Collect(
+		absSourceDir,
+		absOutput,
+		cfg.ExcludePatterns,
+		cfg.IncludePatterns,
+		cfg.ForceTextPatterns,
+		cfg.ForceBinaryPatterns,
+	)
+	if err != nil {
+		return nil, err
+	}
 
-	// File content sections
-	for i := range files {
-		currentLine++                    // The "# filename" header line
-		files[i].StartLine = currentLine // Points to first content line (after header)
-		currentLine += files[i].LineCount
-		currentLine += 2 // two blank lines after content
+	// Load file content
+	for _, df := range discovered {
+		f, err := file.New(
+			df.RelPath,
+			df.FullPath,
+			df.Size,
+			df.IsBinary,
+		)
+		if err != nil {
+			return nil, err
+		}
+		snap.Files = append(snap.Files, f)
+	}
+
+	// Build layout
+	layout := []Content{}
+
+	// Git log section (if present)
+	if len(snap.GitLogLines) > 0 {
+		layout = append(layout,
+			Header("Git Log (git adog)"),
+			GitLogContent(snap.GitLogLines),
+			EmptyLine(),
+			Separator(),
+			EmptyLine(),
+		)
+	}
+
+	// File list section
+	layout = append(layout,
+		Header("Files"),
+		FileListContent(snap.Files),
+		EmptyLine(),
+		Separator(),
+		EmptyLine(),
+	)
+
+	// File contents sections
+	for i, f := range snap.Files {
+		layout = append(layout,
+			Header(f.RelPath),
+			FileContent(f),
+		)
+
+		// Add spacing only if not the last file
+		if i < len(snap.Files)-1 {
+			layout = append(layout,
+				EmptyLine(),
+				EmptyLine(),
+			)
+		}
+	}
+
+	snap.Layout = layout
+
+	// Calculate line ranges
+	snap.calculateLineRanges()
+
+	return snap, nil
+}
+
+// calculateLineRanges calculates and sets StartLine for all files
+func (s *Snapshot) calculateLineRanges() {
+	currentLine := 1
+
+	// Iterate through layout and track line positions
+	for _, content := range s.Layout {
+		// Check if this is a fileContent to record its position
+		if fc, ok := content.(fileContent); ok {
+			// The current line is where this file's content starts
+			fc.File.StartLine = currentLine
+		}
+
+		// Advance current line by this content's line count
+		currentLine += content.LineCount()
 	}
 }
 
-// Run performs the snapshot according to the given configuration.
-func Run(ctx context.Context, cfg Config) error {
-	srcInfo, err := os.Stat(cfg.SourceDir)
-	if err != nil {
-		return fmt.Errorf("cannot stat directory %q: %w", cfg.SourceDir, err)
-	}
-	if !srcInfo.IsDir() {
-		return fmt.Errorf("path %q is not a directory", cfg.SourceDir)
+// WriteTo writes the snapshot to the output
+func (s *Snapshot) WriteTo(w io.Writer) error {
+	if s.Layout == nil {
+		return fmt.Errorf("layout not initialized")
 	}
 
-	absSourceDir, err := filepath.Abs(cfg.SourceDir)
-	if err != nil {
-		return fmt.Errorf("cannot resolve source directory: %w", err)
-	}
+	lt := writer.NewLineTracker(w)
 
-	absOutput, defaultAbs, err := resolveOutputPath(cfg.OutputPath)
-	if err != nil {
-		return err
-	}
-
-	// Overwrite semantics (skip in dry-run mode):
-	// - If output path is the default ./snap.txt in PWD -> always overwrite.
-	// - Else, if file exists and output flag was NOT explicitly set -> refuse.
-	if !cfg.DryRun && absOutput != defaultAbs && !cfg.OutputExplicit {
-		if _, err := os.Stat(absOutput); err == nil {
-			return fmt.Errorf("refusing to overwrite existing file %q; use --output to override", absOutput)
-		}
-	}
-
-	matchers, err := ignore.NewMatchers(absSourceDir, cfg.ExcludePatterns, cfg.IncludePatterns)
-	if err != nil {
-		return err
-	}
-
-	// Collect all file metadata in single walk
-	var files []FileInfo
-	err = filepath.WalkDir(absSourceDir, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			// Skip permission errors silently, propagate others
-			if errors.Is(walkErr, fs.ErrPermission) {
-				return nil
-			}
-			return walkErr
-		}
-
-		if d.IsDir() {
-			return nil
-		}
-
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			return nil
-		}
-		if samePath(absPath, absOutput) {
-			return nil
-		}
-
-		relPath, err := filepath.Rel(absSourceDir, path)
-		if err != nil {
-			return nil
-		}
-		relUnix := filepath.ToSlash(relPath)
-
-		if !matchers.ShouldInclude(relUnix) {
-			return nil
-		}
-
-		// Get file info
-		info, err := d.Info()
-		if err != nil {
-			return nil
-		}
-		fileSize := info.Size()
-
-		var isBinary bool
-		var contentType string
-		var lineCount int
-
-		// Check force overrides first
-		overridden := false
-		isBinary, contentType, overridden = checkForceOverride(relUnix, cfg)
-
-		if !overridden {
-			// Detect binary status, content type, and count lines
-			var detectErr error
-			isBinary, contentType, lineCount, detectErr = isFileBinary(path, fileSize)
-			if detectErr != nil {
-				return nil
-			}
-		} else {
-			// If overridden to binary, set LineCount = 1
-			if isBinary {
-				lineCount = 1
-			}
-			// If overridden to text, LineCount remains 0 (we don't count lines for forced-text files)
-		}
-
-		files = append(files, FileInfo{
-			RelPath:     relUnix,
-			FullPath:    path,
-			Size:        fileSize,
-			IsBinary:    isBinary,
-			ContentType: contentType,
-			LineCount:   lineCount,
-			StartLine:   0, // Will be set by calculateStartLines
-		})
-
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	// Handle dry-run (all info already available)
-	if cfg.DryRun {
-		for _, file := range files {
-			fmt.Println(file.RelPath)
-		}
-		return nil
-	}
-
-	// Normal mode: create output file
-	outFile, err := os.Create(absOutput)
-	if err != nil {
-		return fmt.Errorf("cannot create output file %q: %w", absOutput, err)
-	}
-	defer outFile.Close()
-
-	writer := bufio.NewWriter(outFile)
-	defer writer.Flush()
-
-	// Git log section
-	gitLogLines := 0
-	if cfg.IncludeGitLog && gitlog.HasRepo(absSourceDir) {
-		gitLogLines, err = gitlog.Write(ctx, writer, absSourceDir)
-		if err != nil {
-			return fmt.Errorf("failed to write git log: %w", err)
-		}
-	}
-
-	// Calculate StartLine for all files now that we know gitLogLines
-	calculateStartLines(files, gitLogLines)
-
-	// File list section with line ranges
-	if _, err := fmt.Fprintln(writer, "# Files"); err != nil {
-		return err
-	}
-	for _, file := range files {
-		// StartLine now points to first content line directly
-		contentStart := file.StartLine
-		var contentEnd int
-		if file.IsBinary {
-			contentEnd = contentStart // Binary files have single content line
-		} else {
-			contentEnd = contentStart + file.LineCount - 1
-		}
-
-		// Format: filename [start-end] (optional metadata)
-		if file.IsBinary {
-			sizeStr := formatSize(file.Size)
-			if _, err := fmt.Fprintf(writer, "%s [%d-%d] (binary, %s)\n",
-				file.RelPath, contentStart, contentEnd, sizeStr); err != nil {
-				return err
-			}
-		} else {
-			if _, err := fmt.Fprintf(writer, "%s [%d-%d]\n",
-				file.RelPath, contentStart, contentEnd); err != nil {
-				return err
-			}
-		}
-	}
-	if _, err := fmt.Fprint(writer, "\n# ----------------------------------------\n\n"); err != nil {
-		return err
-	}
-
-	// Write file contents (metadata already known)
-	for _, file := range files {
-		if err := appendFileWithMetadata(writer, file); err != nil {
+	for _, content := range s.Layout {
+		if err := content.WriteTo(lt); err != nil {
 			return err
 		}
 	}
 
-	fmt.Printf("Files concatenated to %s\n", absOutput)
-	return nil
-}
-
-func samePath(a, b string) bool {
-	ra := filepath.Clean(a)
-	rb := filepath.Clean(b)
-	return ra == rb
+	return lt.Flush()
 }
