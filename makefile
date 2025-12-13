@@ -44,7 +44,7 @@ build: clean
 # Local development build
 # ---------------------------------------------------------------------
 
-build-local:
+build-local: clean
 	@mkdir -p "$(DIST_DIR)"
 	@echo "building $(DIST_DIR)/$(BINARY) (VERSION=$(VERSION))"
 	go build -ldflags "$(LDFLAGS)" -o "$(DIST_DIR)/$(BINARY)" $(CMD_PKG)
