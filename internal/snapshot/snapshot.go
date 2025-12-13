@@ -15,6 +15,37 @@ import (
 	"github.com/neox5/snap/internal/ignore"
 )
 
+// calculateStartLines computes the StartLine field for each file in the snapshot.
+// This must be called after we know:
+// - gitLogLines (how many lines the git log section takes)
+// - len(files) (how many files we have)
+//
+// Note: This function calculates line numbers for where files will appear
+// in the final output, which includes the Files list section that hasn't
+// been written yet when this function is called.
+// StartLine points to the first content line (after the "# filename" header).
+func calculateStartLines(files []FileInfo, gitLogLines int) {
+	currentLine := 1
+
+	// Git log section (if present)
+	if gitLogLines > 0 {
+		currentLine += gitLogLines
+	}
+
+	// Files list section (that will be written after this calculation)
+	currentLine++             // "# Files" header
+	currentLine += len(files) // one line per file in the list
+	currentLine += 3          // blank line + separator + blank line
+
+	// File content sections
+	for i := range files {
+		currentLine++                    // The "# filename" header line
+		files[i].StartLine = currentLine // Points to first content line (after header)
+		currentLine += files[i].LineCount
+		currentLine += 2 // two blank lines after content
+	}
+}
+
 // Run performs the snapshot according to the given configuration.
 func Run(ctx context.Context, cfg Config) error {
 	srcInfo, err := os.Stat(cfg.SourceDir)
@@ -89,15 +120,27 @@ func Run(ctx context.Context, cfg Config) error {
 		}
 		fileSize := info.Size()
 
+		var isBinary bool
+		var contentType string
+		var lineCount int
+
 		// Check force overrides first
-		isBinary, contentType, overridden := checkForceOverride(relUnix, cfg)
+		overridden := false
+		isBinary, contentType, overridden = checkForceOverride(relUnix, cfg)
+
 		if !overridden {
-			// Detect binary status and content type
+			// Detect binary status, content type, and count lines
 			var detectErr error
-			isBinary, contentType, detectErr = isFileBinary(path, fileSize)
+			isBinary, contentType, lineCount, detectErr = isFileBinary(path, fileSize)
 			if detectErr != nil {
 				return nil
 			}
+		} else {
+			// If overridden to binary, set LineCount = 1
+			if isBinary {
+				lineCount = 1
+			}
+			// If overridden to text, LineCount remains 0 (we don't count lines for forced-text files)
 		}
 
 		files = append(files, FileInfo{
@@ -106,6 +149,8 @@ func Run(ctx context.Context, cfg Config) error {
 			Size:        fileSize,
 			IsBinary:    isBinary,
 			ContentType: contentType,
+			LineCount:   lineCount,
+			StartLine:   0, // Will be set by calculateStartLines
 		})
 
 		return nil
@@ -133,24 +178,41 @@ func Run(ctx context.Context, cfg Config) error {
 	defer writer.Flush()
 
 	// Git log section
+	gitLogLines := 0
 	if cfg.IncludeGitLog && gitlog.HasRepo(absSourceDir) {
-		if err := gitlog.Write(ctx, writer, absSourceDir); err != nil {
+		gitLogLines, err = gitlog.Write(ctx, writer, absSourceDir)
+		if err != nil {
 			return fmt.Errorf("failed to write git log: %w", err)
 		}
 	}
 
-	// File list section
+	// Calculate StartLine for all files now that we know gitLogLines
+	calculateStartLines(files, gitLogLines)
+
+	// File list section with line ranges
 	if _, err := fmt.Fprintln(writer, "# Files"); err != nil {
 		return err
 	}
 	for _, file := range files {
+		// StartLine now points to first content line directly
+		contentStart := file.StartLine
+		var contentEnd int
+		if file.IsBinary {
+			contentEnd = contentStart // Binary files have single content line
+		} else {
+			contentEnd = contentStart + file.LineCount - 1
+		}
+
+		// Format: filename [start-end] (optional metadata)
 		if file.IsBinary {
 			sizeStr := formatSize(file.Size)
-			if _, err := fmt.Fprintf(writer, "%s [binary, %s]\n", file.RelPath, sizeStr); err != nil {
+			if _, err := fmt.Fprintf(writer, "%s [%d-%d] (binary, %s)\n",
+				file.RelPath, contentStart, contentEnd, sizeStr); err != nil {
 				return err
 			}
 		} else {
-			if _, err := fmt.Fprintln(writer, file.RelPath); err != nil {
+			if _, err := fmt.Fprintf(writer, "%s [%d-%d]\n",
+				file.RelPath, contentStart, contentEnd); err != nil {
 				return err
 			}
 		}

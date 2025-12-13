@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +19,8 @@ type FileInfo struct {
 	Size        int64  // File size in bytes
 	IsBinary    bool   // Whether file should be treated as binary
 	ContentType string // MIME type detected or forced
+	LineCount   int    // Number of lines in file (0 for binary)
+	StartLine   int    // Line number in snap.txt where file content begins
 }
 
 func appendFileWithMetadata(w io.Writer, file FileInfo) error {
@@ -76,52 +79,75 @@ func checkForceOverride(relPath string, cfg Config) (isBinary bool, contentType 
 	return false, "", false // No override
 }
 
-func isFileBinary(path string, size int64) (bool, string, error) {
+func isFileBinary(path string, size int64) (isBinary bool, contentType string, lineCount int, err error) {
 	// Empty files treated as binary
 	if size == 0 {
-		return true, "application/octet-stream", nil
+		return true, "application/octet-stream", 1, nil
 	}
 
 	f, err := os.Open(path)
 	if err != nil {
-		return false, "", err
+		return false, "", 0, err
 	}
 	defer f.Close()
 
 	// Read up to 512 bytes for detection
 	buf := make([]byte, 512)
-	n, err := f.Read(buf)
-	if err != nil && err != io.EOF {
-		return false, "", err
+	n, readErr := f.Read(buf)
+	if readErr != nil && readErr != io.EOF {
+		return false, "", 0, readErr
 	}
 
 	// Use http.DetectContentType
-	contentType := http.DetectContentType(buf[:n])
+	contentType = http.DetectContentType(buf[:n])
 
 	// Check if text content type
 	if strings.HasPrefix(contentType, "text/") {
-		return false, contentType, nil
-	}
-
-	// Known text application types
-	textAppTypes := map[string]bool{
-		"application/json":       true,
-		"application/xml":        true,
-		"application/javascript": true,
-	}
-	if textAppTypes[contentType] {
-		return false, contentType, nil
-	}
-
-	// Fallback: check for null bytes
-	for i := 0; i < n; i++ {
-		if buf[i] == 0 {
-			return true, contentType, nil
+		isBinary = false
+	} else {
+		// Known text application types
+		textAppTypes := map[string]bool{
+			"application/json":       true,
+			"application/xml":        true,
+			"application/javascript": true,
+		}
+		if textAppTypes[contentType] {
+			isBinary = false
+		} else {
+			// Fallback: check for null bytes
+			isBinary = true
+			for i := 0; i < n; i++ {
+				if buf[i] == 0 {
+					return true, contentType, 1, nil
+				}
+			}
+			// No null bytes found, treat as text
+			isBinary = false
 		}
 	}
 
-	// Default to binary when uncertain (safer)
-	return true, contentType, nil
+	// If binary, return now
+	if isBinary {
+		return true, contentType, 1, nil
+	}
+
+	// Count lines for text files
+	_, err = f.Seek(0, 0) // Reset to start
+	if err != nil {
+		return false, contentType, 0, err
+	}
+
+	scanner := bufio.NewScanner(f)
+	lineCount = 0
+	for scanner.Scan() {
+		lineCount++
+	}
+
+	if err = scanner.Err(); err != nil {
+		return false, contentType, 0, err
+	}
+
+	return false, contentType, lineCount, nil
 }
 
 func formatSize(bytes int64) string {
