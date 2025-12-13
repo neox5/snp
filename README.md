@@ -4,57 +4,135 @@
 ![Go Version](https://img.shields.io/github/go-mod/go-version/neox5/snap)
 ![License](https://img.shields.io/github/license/neox5/snap)
 
-`snap` concatenates all readable files of a project into a single deterministic
-snapshot file (`snap.txt`) for inspection, sharing, and machine processing.
+A CLI tool that concatenates all readable files in a project into a single deterministic snapshot file for inspection, sharing, and machine processing.
 
----
+## Quick Start
+
+```bash
+# Install (Linux example)
+curl -LO https://github.com/neox5/snap/releases/latest/download/snap-linux-amd64
+chmod +x snap-linux-amd64
+sudo mv snap-linux-amd64 /usr/local/bin/snap
+
+# Run in any project directory
+cd /path/to/your/project
+snap
+```
+
+Creates `./snap.txt` with all project files concatenated.
+
+## Usage
+
+### Basic Usage
+
+```bash
+snap                    # Create snap.txt in current directory
+snap /path/to/project   # Create snap.txt from specified directory
+```
+
+### Output Control
+
+```bash
+snap --output custom.txt              # Custom output path
+snap --exclude-git-log                # Omit Git log section
+```
+
+### File Filtering
+
+```bash
+snap --include "src/**/*.go"                    # Include only Go files in src/
+snap --exclude "**/*_test.go"                   # Exclude test files
+snap --include "*.log" --exclude "secret.log"   # Combine filters
+```
+
+**Filter precedence** (highest to lowest):
+
+1. `--exclude` patterns (final, cannot be overridden)
+2. `--include` patterns (override defaults and .gitignore)
+3. `.gitignore` patterns
+4. Default excludes (node_modules/, .git/, dist/, etc.)
+
+## How It Works
+
+### What Gets Included
+
+- All text files not matching exclude patterns
+- Git log (if `.git/` exists, unless `--exclude-git-log` is used)
+- Files matching `--include` patterns override .gitignore
+
+### What Gets Excluded
+
+- Directories: `.git/`, `node_modules/`, `.venv/`, `dist/`, `build/`, `target/`, `vendor/`
+- Patterns: `*.log`, `*.tmp`, `**/snap.txt`
+- Files in your `.gitignore`
+- Binary files (shown as `[Binary file - content omitted]`)
+- Files matching `--exclude` patterns
+
+### Output Format
+
+```text
+# Git Log (git adog)
+* ad7b219 (HEAD -> main) improve readme
+* 79e96b6 improve post release check
+
+# ----------------------------------------
+
+# cmd/snap/main.go
+package main
+...
+
+# internal/snapshot/snapshot.go
+package snapshot
+...
+```
+
+Each file section starts with `# relative/path/from/root` followed by the file contents.
+
+### Safety Features
+
+- Default `./snap.txt` always overwrites (safe for repeated runs)
+- Custom output paths require explicit `--output` flag to overwrite existing files
+- Output file automatically excluded from snapshot (prevents recursion)
 
 ## Installation
 
-### Prebuilt Binaries (Recommended)
+### Prebuilt Binaries
 
-Download, verify, and install in one step sequence:
+**Linux (amd64)**
 
 ```bash
-# download binary
 curl -LO https://github.com/neox5/snap/releases/latest/download/snap-linux-amd64
-
-# download checksum
 curl -LO https://github.com/neox5/snap/releases/latest/download/snap-linux-amd64.sha256
-
-# verify integrity
 sha256sum -c snap-linux-amd64.sha256
-
-# install
 chmod +x snap-linux-amd64
 sudo mv snap-linux-amd64 /usr/local/bin/snap
-````
+```
 
-Replace `linux-amd64` with your platform:
+**macOS (Apple Silicon)**
 
-* `linux-arm64`
-* `darwin-amd64`
-* `darwin-arm64`
-* `windows-amd64.exe`
-* `windows-arm64.exe`
+```bash
+curl -LO https://github.com/neox5/snap/releases/latest/download/snap-darwin-arm64
+curl -LO https://github.com/neox5/snap/releases/latest/download/snap-darwin-arm64.sha256
+shasum -a 256 -c snap-darwin-arm64.sha256
+chmod +x snap-darwin-arm64
+sudo mv snap-darwin-arm64 /usr/local/bin/snap
+```
 
----
+**Available platforms:**
 
-### Via `go install`
+- `snap-linux-amd64` / `snap-linux-arm64`
+- `snap-darwin-amd64` / `snap-darwin-arm64`
+- `snap-windows-amd64.exe` / `snap-windows-arm64.exe`
 
-Requires **Go 1.22+**.
+### Via Go
+
+Requires Go 1.22+
 
 ```bash
 go install github.com/neox5/snap/cmd/snap@latest
 ```
 
-Ensure Go’s bin directory is in your `PATH`:
-
-```bash
-export PATH="$HOME/go/bin:$PATH"
-```
-
----
+Ensure `$HOME/go/bin` is in your `PATH`.
 
 ### From Source
 
@@ -65,104 +143,46 @@ make build-local
 sudo mv dist/snap /usr/local/bin/snap
 ```
 
----
-
 ### Verify Installation
 
 ```bash
 snap --version
 ```
 
----
+## Use Cases
 
-## Usage
+- Provide complete codebase context to LLMs
+- Generate documentation from source
+- Code review preparation
+- Project archival and snapshots
+- Quick sharing of entire project structure
 
-Run `snap` in any project directory:
+## Advanced Examples
 
-```bash
-snap
-```
-
-This creates:
-
-```text
-./snap.txt
-```
-
-With custom filtering:
+### Include only specific file types
 
 ```bash
-snap --include "src/**/*.go" --exclude "**/*_test.go"
+snap --include "**/*.{go,md,txt}"
 ```
 
-With Git log omitted:
+### Exclude tests and generated code
+
+```bash
+snap --exclude "**/*_test.go" --exclude "**/generated/**"
+```
+
+### Custom output with specific includes
+
+```bash
+snap --output docs-snapshot.txt --include "docs/**" --include "*.md"
+```
+
+### Snapshot without version control info
 
 ```bash
 snap --exclude-git-log
 ```
 
----
-
-## Output Structure (`snap.txt`)
-
-The snapshot file is structured as a continuous, deterministic stream:
-
-```text
-# Git Log (git adog3)
-<optional git history>
-
-# ----------------------------------------
-
-# path/to/file.go
-<file contents>
-
-# another/file.txt
-<file contents>
-```
-
-Each file is preceded by a header:
-
-```text
-# relative/path/from/project/root
-```
-
----
-
-## Text vs. Binary Handling
-
-* **Readable text files**
-  → Fully inlined into `snap.txt`
-
-* **Binary / media files by extension**
-  → Listed with placeholder:
-
-  ```text
-  [Binary file - content omitted]
-  ```
-
-* **Non-text, unknown formats**
-  → Omitted with:
-
-  ```text
-  [Non-text file - content omitted]
-  ```
-
----
-
-## Default Binary Extensions
-
-Content is omitted for common binary formats including:
-
-```text
-exe, dll, so, dylib, zip, tar, gz, 7z,
-png, jpg, jpeg, gif, bmp, tiff, webp,
-mp4, mp3, avi, mov, mkv, wav, flac,
-pdf, doc, docx, xls, xlsx, ppt, pptx
-```
-
----
-
 ## License
 
-MIT License — see `LICENSE` file for full text.
-
+MIT License — see [LICENSE](LICENSE) file for details.

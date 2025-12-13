@@ -33,11 +33,18 @@ var DefaultPatterns = []string{
 	"**/*.snap.txt",
 }
 
-// Matchers holds compiled ignore and include patterns.
+// Matchers holds compiled ignore and include patterns with proper precedence.
+//
+// Precedence order:
+//  1. Base ignore (defaults + .gitignore)
+//  2. Include patterns override base ignore
+//  3. Exclude patterns are final (cannot be overridden)
 type Matchers struct {
-	ignore      *gitignore.GitIgnore
-	include     *gitignore.GitIgnore
+	baseIgnore  *gitignore.GitIgnore // defaults + .gitignore
+	include     *gitignore.GitIgnore // CLI --include
+	exclude     *gitignore.GitIgnore // CLI --exclude (final)
 	hasIncludes bool
+	hasExcludes bool
 }
 
 // NewMatchers builds ignore/include matchers from defaults, .gitignore,
@@ -48,61 +55,71 @@ func NewMatchers(sourceDir string, excludePatterns, includePatterns []string) (*
 		return nil, err
 	}
 
-	var ignoreLines []string
-	ignoreLines = append(ignoreLines, DefaultPatterns...)
+	// Base ignore: defaults + .gitignore
+	var baseIgnoreLines []string
+	baseIgnoreLines = append(baseIgnoreLines, DefaultPatterns...)
 
-	// CLI excludes
-	ignoreLines = append(ignoreLines, excludePatterns...)
-
-	// .gitignore at sourceDir (if present)
 	gitignorePath := filepath.Join(absSourceDir, ".gitignore")
 	if b, err := os.ReadFile(gitignorePath); err == nil {
 		lines := strings.Split(string(b), "\n")
-		ignoreLines = append(ignoreLines, lines...)
+		baseIgnoreLines = append(baseIgnoreLines, lines...)
 	}
 
-	var ignoreMatcher *gitignore.GitIgnore
-	if len(ignoreLines) > 0 {
-		ignoreMatcher = gitignore.CompileIgnoreLines(ignoreLines...)
+	var baseIgnoreMatcher *gitignore.GitIgnore
+	if len(baseIgnoreLines) > 0 {
+		baseIgnoreMatcher = gitignore.CompileIgnoreLines(baseIgnoreLines...)
 	}
 
+	// Include patterns
 	var includeMatcher *gitignore.GitIgnore
 	if len(includePatterns) > 0 {
 		includeMatcher = gitignore.CompileIgnoreLines(includePatterns...)
 	}
 
+	// Exclude patterns (final override)
+	var excludeMatcher *gitignore.GitIgnore
+	if len(excludePatterns) > 0 {
+		excludeMatcher = gitignore.CompileIgnoreLines(excludePatterns...)
+	}
+
 	return &Matchers{
-		ignore:      ignoreMatcher,
+		baseIgnore:  baseIgnoreMatcher,
 		include:     includeMatcher,
+		exclude:     excludeMatcher,
 		hasIncludes: len(includePatterns) > 0,
+		hasExcludes: len(excludePatterns) > 0,
 	}, nil
 }
 
 // ShouldInclude decides if a relative path should be included in the snapshot.
 //
 // relPath must be a path relative to sourceDir, with forward slashes ("/").
+//
+// Logic:
+//  1. If matched by --exclude: always exclude (final decision)
+//  2. If matched by --include: include (overrides base ignore)
+//  3. If matched by base ignore (defaults + .gitignore): exclude
+//  4. Otherwise: include
 func (m *Matchers) ShouldInclude(relPath string) bool {
 	if m == nil {
 		return true
 	}
 
-	ignored := false
-	if m.ignore != nil && m.ignore.MatchesPath(relPath) {
-		ignored = true
-	}
-
-	included := false
-	if m.include != nil && m.include.MatchesPath(relPath) {
-		included = true
-	}
-
-	if m.hasIncludes {
-		// Include if rescued OR not ignored
-		return included || !ignored
-	}
-
-	if ignored {
+	// Step 1: Check final excludes (highest priority - cannot be overridden)
+	if m.hasExcludes && m.exclude != nil && m.exclude.MatchesPath(relPath) {
 		return false
 	}
+
+	// Step 2: Check includes (overrides base ignore)
+	if m.hasIncludes && m.include != nil && m.include.MatchesPath(relPath) {
+		return true
+	}
+
+	// Step 3: Check base ignore (defaults + .gitignore)
+	if m.baseIgnore != nil && m.baseIgnore.MatchesPath(relPath) {
+		return false
+	}
+
+	// Step 4: Default to include
 	return true
 }
