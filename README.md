@@ -205,6 +205,41 @@ snap --dry-run --exclude "**/*_test.go"
 snap --exclude "**/*_test.go"
 ```
 
+## Release
+
+### Creating a Release
+
+Ensure all changes are merged to `main` and the working tree is clean:
+
+```bash
+git tag -a v1.2.3 -m "Release v1.2.3"
+make release
+```
+
+The `release` script will:
+
+- Verify clean git state and exact tag match
+- Run all tests
+- Build release artifacts for all platforms
+- Verify checksums and binary version
+
+Follow the printed instructions to push the tag and create the GitHub release.
+
+### Post-Release Verification
+
+Verify the published release on a clean system:
+
+```bash
+make post-release
+```
+
+The `post-release` script will:
+
+- Auto-detect your OS and architecture
+- Download the latest release binary and checksum
+- Verify the SHA256 checksum
+- Verify the binary runs and reports correct version
+
 ## License
 
-MIT License — see [LICENSE](LICENSE) file for details.
+MIT License â€” see [LICENSE](LICENSE) file for details.
