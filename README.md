@@ -1,3 +1,11 @@
+<br/>
+
+<div align="center">
+  <img src="logo.png" alt="snap logo" width="200"/>
+</div>
+
+<br/>
+
 # snap
 
 [![Release](https://img.shields.io/github/v/release/neox5/snap)](https://github.com/neox5/snap/releases)
