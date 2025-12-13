@@ -38,6 +38,10 @@ If DIRECTORY is omitted, '.' is used.`,
 				Name:  "exclude-git-log",
 				Usage: "Omit the Git log section (included by default)",
 			},
+			&cli.BoolFlag{
+				Name:  "dry-run",
+				Usage: "Print files that would be included without creating output",
+			},
 		},
 		ArgsUsage: "[DIRECTORY]",
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -52,6 +56,7 @@ If DIRECTORY is omitted, '.' is used.`,
 				IncludePatterns: c.StringSlice("include"),
 				ExcludePatterns: c.StringSlice("exclude"),
 				IncludeGitLog:   !c.Bool("exclude-git-log"),
+				DryRun:          c.Bool("dry-run"),
 				// Was the flag explicitly set?
 				OutputExplicit: c.IsSet("output"),
 			}

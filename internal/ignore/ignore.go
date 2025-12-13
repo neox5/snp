@@ -3,6 +3,7 @@
 package ignore
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,6 +54,15 @@ func NewMatchers(sourceDir string, excludePatterns, includePatterns []string) (*
 	absSourceDir, err := filepath.Abs(sourceDir)
 	if err != nil {
 		return nil, err
+	}
+
+	// Validate directory exists
+	info, err := os.Stat(absSourceDir)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%q is not a directory", absSourceDir)
 	}
 
 	// Base ignore: defaults + .gitignore

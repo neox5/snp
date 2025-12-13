@@ -35,6 +35,7 @@ snap /path/to/project   # Create snap.txt from specified directory
 ```bash
 snap --output custom.txt              # Custom output path
 snap --exclude-git-log                # Omit Git log section
+snap --dry-run                        # List files without creating output
 ```
 
 ### File Filtering
@@ -43,7 +44,11 @@ snap --exclude-git-log                # Omit Git log section
 snap --include "src/**/*.go"                    # Include only Go files in src/
 snap --exclude "**/*_test.go"                   # Exclude test files
 snap --include "*.log" --exclude "secret.log"   # Combine filters
+snap --exclude "*.tmp" --exclude "*.log"        # Multiple exclude patterns
+snap --include "**/*.go" --include "**/*.md"    # Multiple include patterns
 ```
+
+**Note:** Both `--include` and `--exclude` flags can be specified multiple times.
 
 **Filter precedence** (highest to lowest):
 
@@ -159,6 +164,13 @@ snap --version
 
 ## Advanced Examples
 
+### Preview files before creating snapshot
+
+```bash
+snap --dry-run                        # List all files that would be included
+snap --dry-run --include "**/*.go"    # Preview with filters
+```
+
 ### Include only specific file types
 
 ```bash
@@ -181,6 +193,16 @@ snap --output docs-snapshot.txt --include "docs/**" --include "*.md"
 
 ```bash
 snap --exclude-git-log
+```
+
+### Verify filtering before snapshot
+
+```bash
+# Check which files will be included
+snap --dry-run --exclude "**/*_test.go"
+
+# If satisfied, create the snapshot
+snap --exclude "**/*_test.go"
 ```
 
 ## License

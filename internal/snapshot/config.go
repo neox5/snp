@@ -7,6 +7,7 @@ type Config struct {
 	IncludePatterns []string
 	ExcludePatterns []string
 	IncludeGitLog   bool
+	DryRun          bool
 	// OutputExplicit indicates if --output was explicitly set.
 	OutputExplicit bool
 }

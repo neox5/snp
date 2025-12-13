@@ -35,15 +35,26 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 
-	// Overwrite semantics:
+	// Overwrite semantics (skip in dry-run mode):
 	// - If output path is the default ./snap.txt in PWD -> always overwrite.
 	// - Else, if file exists and output flag was NOT explicitly set -> refuse.
-	if absOutput != defaultAbs && !cfg.OutputExplicit {
+	if !cfg.DryRun && absOutput != defaultAbs && !cfg.OutputExplicit {
 		if _, err := os.Stat(absOutput); err == nil {
 			return fmt.Errorf("refusing to overwrite existing file %q; use --output to override", absOutput)
 		}
 	}
 
+	matchers, err := ignore.NewMatchers(absSourceDir, cfg.ExcludePatterns, cfg.IncludePatterns)
+	if err != nil {
+		return err
+	}
+
+	// In dry-run mode, just list files that would be included
+	if cfg.DryRun {
+		return dryRun(absSourceDir, absOutput, matchers)
+	}
+
+	// Normal mode: create output file
 	outFile, err := os.Create(absOutput)
 	if err != nil {
 		return fmt.Errorf("cannot create output file %q: %w", absOutput, err)
@@ -58,11 +69,6 @@ func Run(ctx context.Context, cfg Config) error {
 		if err := gitlog.Write(ctx, writer, absSourceDir); err != nil {
 			return fmt.Errorf("failed to write git log: %w", err)
 		}
-	}
-
-	matchers, err := ignore.NewMatchers(absSourceDir, cfg.ExcludePatterns, cfg.IncludePatterns)
-	if err != nil {
-		return err
 	}
 
 	// Walk directory tree and concatenate files
@@ -111,4 +117,52 @@ func samePath(a, b string) bool {
 	ra := filepath.Clean(a)
 	rb := filepath.Clean(b)
 	return ra == rb
+}
+
+// dryRun lists all files that would be included in the snapshot.
+func dryRun(absSourceDir, absOutput string, matchers *ignore.Matchers) error {
+	var files []string
+
+	err := filepath.WalkDir(absSourceDir, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if errors.Is(walkErr, fs.ErrPermission) {
+				return nil
+			}
+			return walkErr
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return nil
+		}
+		if samePath(absPath, absOutput) {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(absSourceDir, path)
+		if err != nil {
+			return nil
+		}
+		relUnix := filepath.ToSlash(relPath)
+
+		if !matchers.ShouldInclude(relUnix) {
+			return nil
+		}
+
+		files = append(files, relUnix)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		fmt.Println(file)
+	}
+
+	return nil
 }
