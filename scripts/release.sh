@@ -3,8 +3,8 @@ set -euo pipefail
 
 # --- Configuration -----------------------------------------------------------
 
-BINARY="snap"
-MODULE="github.com/neox5/snap"
+BINARY="snp"
+MODULE="github.com/neox5/snp"
 DIST_DIR="dist"
 
 # --- Helpers -----------------------------------------------------------------
@@ -96,8 +96,8 @@ Next steps:
 3. (Optional) Post-release installation check on a clean system:
    - Download a binary + .sha256 from GitHub Releases
    - Verify:
-       sha256sum -c snap-<os>-<arch>.sha256
+       sha256sum -c snp-<os>-<arch>.sha256
    - Run:
-       ./snap-<os>-<arch> --version   # should print $CURRENT_TAG
+       ./snp-<os>-<arch> --version   # should print $CURRENT_TAG
 
 EOF

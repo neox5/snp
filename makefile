@@ -1,6 +1,6 @@
-BINARY      := snap
-CMD_PKG     := ./cmd/snap
-MODULE_PATH := github.com/neox5/snap
+BINARY      := snp
+CMD_PKG     := ./cmd/snp
+MODULE_PATH := github.com/neox5/snp
 
 DIST_DIR    := dist
 

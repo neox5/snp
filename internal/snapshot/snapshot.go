@@ -6,9 +6,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/neox5/snap/internal/file"
-	"github.com/neox5/snap/internal/gitlog"
-	"github.com/neox5/snap/internal/writer"
+	"github.com/neox5/snp/internal/file"
+	"github.com/neox5/snp/internal/gitlog"
+	"github.com/neox5/snp/internal/writer"
 )
 
 // Snapshot represents the complete snapshot data

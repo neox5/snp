@@ -3,8 +3,8 @@ package snapshot
 import (
 	"fmt"
 
-	"github.com/neox5/snap/internal/file"
-	"github.com/neox5/snap/internal/writer"
+	"github.com/neox5/snp/internal/file"
+	"github.com/neox5/snp/internal/writer"
 )
 
 // Content represents anything that can be written to the output

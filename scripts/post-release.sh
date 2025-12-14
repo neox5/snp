@@ -15,8 +15,8 @@ set -euo pipefail
 #   or
 #   ./scripts/post-release.sh
 
-BINARY="snap"
-OWNER_REPO="neox5/snap"
+BINARY="snp"
+OWNER_REPO="neox5/snp"
 
 fail() {
   echo "ERROR: $1" >&2

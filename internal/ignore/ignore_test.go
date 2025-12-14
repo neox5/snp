@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/neox5/snap/internal/ignore"
+	"github.com/neox5/snp/internal/ignore"
 )
 
 func TestShouldInclude_Precedence(t *testing.T) {

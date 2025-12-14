@@ -7,7 +7,7 @@ import (
 )
 
 func resolveOutputPath(outputPath string) (absOutput string, defaultAbs string, err error) {
-	const defaultName = "snap.txt"
+	const defaultName = "snp.txt"
 
 	defaultAbs, err = filepath.Abs(defaultName)
 	if err != nil {

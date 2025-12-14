@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-BINARY="snap-analysis"
+BINARY="snp-analysis"
 
 # Cleanup on exit
 trap 'rm -f "$BINARY" "${BINARY}-stripped"' EXIT
@@ -28,7 +28,7 @@ echo
 # ============================================================================
 echo "Step 1: Building unstripped binary"
 echo "---"
-if ! go build -o "$BINARY" ./cmd/snap 2>&1; then
+if ! go build -o "$BINARY" ./cmd/snp 2>&1; then
     echo "Build failed"
     exit 1
 fi
@@ -153,14 +153,14 @@ echo "Step 6: Dependencies"
 echo "---"
 
 # Get all dependencies
-ALL_DEPS=$(go list -deps ./cmd/snap 2>/dev/null)
+ALL_DEPS=$(go list -deps ./cmd/snp 2>/dev/null)
 TOTAL=$(echo "$ALL_DEPS" | wc -l | tr -d ' ')
 
 # Count stdlib (no slash in import path)
 STDLIB=$(echo "$ALL_DEPS" | grep -v "/" | wc -l | tr -d ' ')
 
 # Count external (non-standard)
-EXTERNAL=$(go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}' -deps ./cmd/snap 2>/dev/null | wc -l | tr -d ' ')
+EXTERNAL=$(go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}' -deps ./cmd/snp 2>/dev/null | wc -l | tr -d ' ')
 
 echo "Total packages: $TOTAL"
 echo "  Standard library: $STDLIB"
@@ -172,7 +172,7 @@ echo
 # ============================================================================
 echo "Step 7: External dependencies"
 echo "---"
-go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}' -deps ./cmd/snap 2>/dev/null | sort | grep -v "^$MODULE"
+go list -f '{{if not .Standard}}{{.ImportPath}}{{end}}' -deps ./cmd/snp 2>/dev/null | sort | grep -v "^$MODULE"
 echo
 
 # ============================================================================
@@ -180,7 +180,7 @@ echo
 # ============================================================================
 echo "Step 8: Impact of stripping"
 echo "---"
-go build -ldflags="-s -w" -o "${BINARY}-stripped" ./cmd/snap 2>/dev/null
+go build -ldflags="-s -w" -o "${BINARY}-stripped" ./cmd/snp 2>/dev/null
 
 STRIPPED_BYTES=$(stat -f%z "${BINARY}-stripped" 2>/dev/null || stat -c%s "${BINARY}-stripped")
 STRIPPED_MB=$(awk "BEGIN {printf \"%.2f\", $STRIPPED_BYTES / 1048576}")

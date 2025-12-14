@@ -1,4 +1,4 @@
-// Package version holds the snap CLI version. It is overridden at build time
+// Package version holds the snp CLI version. It is overridden at build time
 // via -ldflags in the Makefile, and falls back to module build metadata.
 package version
 

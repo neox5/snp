@@ -8,24 +8,24 @@ import (
 
 	cli "github.com/urfave/cli/v3"
 
-	"github.com/neox5/snap/internal/snapshot"
-	"github.com/neox5/snap/internal/version"
+	"github.com/neox5/snp/internal/snapshot"
+	"github.com/neox5/snp/internal/version"
 )
 
 func main() {
 	app := &cli.Command{
-		Name:    "snap",
+		Name:    "snp",
 		Usage:   "Concatenate readable source/text files into one snapshot file.",
 		Version: version.String(),
-		UsageText: `snap [OPTIONS] [DIRECTORY]
+		UsageText: `snp [OPTIONS] [DIRECTORY]
 
 Concatenates readable source/text files into one snapshot file.
 If DIRECTORY is omitted, '.' is used.`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "output",
-				Usage: "Set output file path (default: ./snap.txt)",
-				Value: "snap.txt",
+				Usage: "Set output file path (default: ./snp.txt)",
+				Value: "snp.txt",
 			},
 			&cli.StringSliceFlag{
 				Name:  "include",
@@ -104,6 +104,6 @@ If DIRECTORY is omitted, '.' is used.`,
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
-		log.Fatalf("snap: %v", err)
+		log.Fatalf("snp: %v", err)
 	}
 }

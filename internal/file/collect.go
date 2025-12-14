@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/neox5/snap/internal/ignore"
+	"github.com/neox5/snp/internal/ignore"
 )
 
 // Collect discovers, analyzes, and loads files to include in the snapshot

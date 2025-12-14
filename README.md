@@ -1,16 +1,16 @@
 <br/>
 
 <div align="center">
-  <img src="logo.png" alt="snap logo" width="200"/>
+  <img src="logo.png" alt="snp logo" width="200"/>
 </div>
 
 <br/>
 
-# snap
+# snp
 
-[![Release](https://img.shields.io/github/v/release/neox5/snap)](https://github.com/neox5/snap/releases)
-![Go Version](https://img.shields.io/github/go-mod/go-version/neox5/snap)
-![License](https://img.shields.io/github/license/neox5/snap)
+[![Release](https://img.shields.io/github/v/release/neox5/snp)](https://github.com/neox5/snp/releases)
+![Go Version](https://img.shields.io/github/go-mod/go-version/neox5/snp)
+![License](https://img.shields.io/github/license/neox5/snp)
 
 A CLI tool that concatenates all readable files in a project into a single deterministic snapshot file for inspection, sharing, and machine processing.
 
@@ -18,42 +18,42 @@ A CLI tool that concatenates all readable files in a project into a single deter
 
 ```bash
 # Install (Linux example)
-curl -LO https://github.com/neox5/snap/releases/latest/download/snap-linux-amd64
-chmod +x snap-linux-amd64
-sudo mv snap-linux-amd64 /usr/local/bin/snap
+curl -LO https://github.com/neox5/snp/releases/latest/download/snp-linux-amd64
+chmod +x snp-linux-amd64
+sudo mv snp-linux-amd64 /usr/local/bin/snp
 
 # Run in any project directory
 cd /path/to/your/project
-snap
+snp
 ```
 
-Creates `./snap.txt` with all project files concatenated.
+Creates `./snp.txt` with all project files concatenated.
 
 ## Usage
 
 ### Basic Usage
 
 ```bash
-snap                    # Create snap.txt in current directory
-snap /path/to/project   # Create snap.txt from specified directory
+snp                    # Create snp.txt in current directory
+snp /path/to/project   # Create snp.txt from specified directory
 ```
 
 ### Output Control
 
 ```bash
-snap --output custom.txt              # Custom output path
-snap --exclude-git-log                # Omit Git log section
-snap --dry-run                        # List files without creating output
+snp --output custom.txt              # Custom output path
+snp --exclude-git-log                # Omit Git log section
+snp --dry-run                        # List files without creating output
 ```
 
 ### File Filtering
 
 ```bash
-snap --include "src/**/*.go"                    # Include only Go files in src/
-snap --exclude "**/*_test.go"                   # Exclude test files
-snap --include "*.log" --exclude "secret.log"   # Combine filters
-snap --exclude "*.tmp" --exclude "*.log"        # Multiple exclude patterns
-snap --include "**/*.go" --include "**/*.md"    # Multiple include patterns
+snp --include "src/**/*.go"                    # Include only Go files in src/
+snp --exclude "**/*_test.go"                   # Exclude test files
+snp --include "*.log" --exclude "secret.log"   # Combine filters
+snp --exclude "*.tmp" --exclude "*.log"        # Multiple exclude patterns
+snp --include "**/*.go" --include "**/*.md"    # Multiple include patterns
 ```
 
 **Note:** Both `--include` and `--exclude` flags can be specified multiple times.
@@ -78,9 +78,9 @@ Binary files are automatically detected and excluded from content output:
 **Override binary detection:**
 
 ```bash
-snap --force-text "**/.env"              # Force .env files to be treated as text
-snap --force-binary "**/*.dat"           # Force .dat files to be treated as binary
-snap --force-text "**/*.config" --force-binary "data/secret.config"
+snp --force-text "**/.env"              # Force .env files to be treated as text
+snp --force-binary "**/*.dat"           # Force .dat files to be treated as binary
+snp --force-text "**/*.config" --force-binary "data/secret.config"
 # Multiple patterns (force-binary always wins in conflicts)
 ```
 
@@ -103,7 +103,7 @@ snap --force-text "**/*.config" --force-binary "data/secret.config"
 ### What Gets Excluded
 
 - Directories: `.git/`, `node_modules/`, `.venv/`, `dist/`, `build/`, `target/`, `vendor/`
-- Patterns: `*.log`, `*.tmp`, `**/snap.txt`
+- Patterns: `*.log`, `*.tmp`, `**/snp.txt`
 - Files in your `.gitignore`
 - Binary files (detected automatically or via `--force-binary`)
 - Empty files (treated as binary)
@@ -121,7 +121,7 @@ Total lines: 2284
 .gitignore [55-59] (5 lines, 42 bytes)
 LICENSE [63-83] (21 lines, 1.1 KB)
 README.md [87-399] (313 lines, 7.6 KB)
-cmd/snap/main.go [403-511] (109 lines, 2.7 KB)
+cmd/snp/main.go [403-511] (109 lines, 2.7 KB)
 logo.png [1746-1746] (binary, 43.7 KB)
 ...
 
@@ -138,8 +138,8 @@ logo.png [1746-1746] (binary, 43.7 KB)
 # build folder
 dist
 
-# snap file
-snap.txt
+# snp file
+snp.txt
 
 # ----------------------------------------
 
@@ -154,7 +154,7 @@ MIT License
 
 # ----------------------------------------
 
-# cmd/snap/main.go
+# cmd/snp/main.go
 package main
 ...
 ```
@@ -182,7 +182,7 @@ Use the file index to quickly locate files by line number in the snapshot.
 
 ### Safety Features
 
-- Default `./snap.txt` always overwrites (safe for repeated runs)
+- Default `./snp.txt` always overwrites (safe for repeated runs)
 - Custom output paths require explicit `--output` flag to overwrite existing files
 - Output file automatically excluded from snapshot (prevents recursion)
 - Binary files excluded by default to prevent corruption
@@ -202,17 +202,17 @@ Include these instructions to help AI assistants understand how to work with sna
 ```
 ## Working with Repository Snapshots
 
-Snapshots were generated with [snap](https://github.com/neox5/snap).
+Snapshots were generated with [snp](https://github.com/neox5/snp).
 
-**Rules for working with snap.txt:**
+**Rules for working with snp.txt:**
 
-- snap.txt is a READ-ONLY reference document
-- DO NOT modify snap.txt directly
-- DO NOT create updated versions of snap.txt
+- snp.txt is a READ-ONLY reference document
+- DO NOT modify snp.txt directly
+- DO NOT create updated versions of snp.txt
 - Changes must target actual source files in their original locations
-- User will regenerate snap.txt by running snap after changes
+- User will regenerate snp.txt by running snp after changes
 
-**How to use snap.txt:**
+**How to use snp.txt:**
 
 1. File index is at the top with line ranges
 2. Each file section starts with # filepath
@@ -227,35 +227,35 @@ Snapshots were generated with [snap](https://github.com/neox5/snap).
 **Linux (amd64)**
 
 ```bash
-curl -LO https://github.com/neox5/snap/releases/latest/download/snap-linux-amd64
-curl -LO https://github.com/neox5/snap/releases/latest/download/snap-linux-amd64.sha256
-sha256sum -c snap-linux-amd64.sha256
-chmod +x snap-linux-amd64
-sudo mv snap-linux-amd64 /usr/local/bin/snap
+curl -LO https://github.com/neox5/snp/releases/latest/download/snp-linux-amd64
+curl -LO https://github.com/neox5/snp/releases/latest/download/snp-linux-amd64.sha256
+sha256sum -c snp-linux-amd64.sha256
+chmod +x snp-linux-amd64
+sudo mv snp-linux-amd64 /usr/local/bin/snp
 ```
 
 **macOS (Apple Silicon)**
 
 ```bash
-curl -LO https://github.com/neox5/snap/releases/latest/download/snap-darwin-arm64
-curl -LO https://github.com/neox5/snap/releases/latest/download/snap-darwin-arm64.sha256
-shasum -a 256 -c snap-darwin-arm64.sha256
-chmod +x snap-darwin-arm64
-sudo mv snap-darwin-arm64 /usr/local/bin/snap
+curl -LO https://github.com/neox5/snp/releases/latest/download/snp-darwin-arm64
+curl -LO https://github.com/neox5/snp/releases/latest/download/snp-darwin-arm64.sha256
+shasum -a 256 -c snp-darwin-arm64.sha256
+chmod +x snp-darwin-arm64
+sudo mv snp-darwin-arm64 /usr/local/bin/snp
 ```
 
 **Available platforms:**
 
-- `snap-linux-amd64` / `snap-linux-arm64`
-- `snap-darwin-amd64` / `snap-darwin-arm64`
-- `snap-windows-amd64.exe` / `snap-windows-arm64.exe`
+- `snp-linux-amd64` / `snp-linux-arm64`
+- `snp-darwin-amd64` / `snp-darwin-arm64`
+- `snp-windows-amd64.exe` / `snp-windows-arm64.exe`
 
 ### Via Go
 
 Requires Go 1.22+
 
 ```bash
-go install github.com/neox5/snap/cmd/snap@latest
+go install github.com/neox5/snp/cmd/snp@latest
 ```
 
 Ensure `$HOME/go/bin` is in your `PATH`.
@@ -263,16 +263,16 @@ Ensure `$HOME/go/bin` is in your `PATH`.
 ### From Source
 
 ```bash
-git clone https://github.com/neox5/snap
-cd snap
+git clone https://github.com/neox5/snp
+cd snp
 make build-local
-sudo mv dist/snap /usr/local/bin/snap
+sudo mv dist/snp /usr/local/bin/snp
 ```
 
 ### Verify Installation
 
 ```bash
-snap --version
+snp --version
 ```
 
 ## Advanced Examples
@@ -280,68 +280,68 @@ snap --version
 ### Preview files before creating snapshot
 
 ```bash
-snap --dry-run                        # List all files that would be included
-snap --dry-run --include "**/*.go"    # Preview with filters
+snp --dry-run                        # List all files that would be included
+snp --dry-run --include "**/*.go"    # Preview with filters
 ```
 
 ### Include only specific file types
 
 ```bash
-snap --include "**/*.{go,md,txt}"
+snp --include "**/*.{go,md,txt}"
 ```
 
 ### Exclude tests and generated code
 
 ```bash
-snap --exclude "**/*_test.go" --exclude "**/generated/**"
+snp --exclude "**/*_test.go" --exclude "**/generated/**"
 ```
 
 ### Custom output with specific includes
 
 ```bash
-snap --output docs-snapshot.txt --include "docs/**" --include "*.md"
+snp --output docs-snapshot.txt --include "docs/**" --include "*.md"
 ```
 
 ### Snapshot without version control info
 
 ```bash
-snap --exclude-git-log
+snp --exclude-git-log
 ```
 
 ### Force specific file types
 
 ```bash
 # Force .env files to be treated as text (normally detected as binary)
-snap --force-text "**/.env" --force-text "**/.editorconfig"
+snp --force-text "**/.env" --force-text "**/.editorconfig"
 
 # Force .dat files to be binary (even if they contain text)
-snap --force-binary "**/*.dat"
+snp --force-binary "**/*.dat"
 
 # Combine with other filters
-snap --include "config/**" --force-text "**/.env"
+snp --include "config/**" --force-text "**/.env"
 ```
 
 ### Verify filtering before snapshot
 
 ```bash
 # Check which files will be included
-snap --dry-run --exclude "**/*_test.go"
+snp --dry-run --exclude "**/*_test.go"
 
 # If satisfied, create the snapshot
-snap --exclude "**/*_test.go"
+snp --exclude "**/*_test.go"
 ```
 
 ### Handle edge cases with force flags
 
 ```bash
 # Custom binary format that looks like text
-snap --force-binary "**/*.myformat"
+snp --force-binary "**/*.myformat"
 
 # Text file with unusual extension
-snap --force-text "data/config.bin"
+snp --force-text "data/config.bin"
 
 # Force takes precedence over detection
-snap --force-text "**/*.log"  # Include log files as text
+snp --force-text "**/*.log"  # Include log files as text
 ```
 
 ## Release
@@ -381,4 +381,4 @@ The `post-release` script will:
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) file for details.
+MIT License – see [LICENSE](LICENSE) file for details.

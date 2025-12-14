@@ -1,4 +1,4 @@
-module github.com/neox5/snap
+module github.com/neox5/snp
 
 go 1.25.3
 
