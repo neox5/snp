@@ -110,29 +110,75 @@ snap --force-text "**/*.config" --force-binary "data/secret.config"
 
 ### Output Format
 
+The snapshot begins with a summary, file index, optional git log, and then the file contents:
+
 ```text
+Generated: 2025-12-14 18:13:40
+Total files: 24 (23 text, 1 binary)
+Total lines: 2284
+
+# File Index
+.gitignore [55-59] (5 lines, 42 bytes)
+LICENSE [63-83] (21 lines, 1.1 KB)
+README.md [87-399] (313 lines, 7.6 KB)
+cmd/snap/main.go [403-511] (109 lines, 2.7 KB)
+logo.png [1746-1746] (binary, 43.7 KB)
+...
+
+# ----------------------------------------
+
 # Git Log (git adog)
-* ad7b219 (HEAD -> main) improve readme
-* 79e96b6 improve post release check
+* f79aeb1 (HEAD -> main) add snapshot index and refactor layout construction
+* 653b8ab refactor snapshot creation and rendering
+...
+
+# ----------------------------------------
+
+# .gitignore
+# build folder
+dist
+
+# snap file
+snap.txt
+
+# ----------------------------------------
+
+# LICENSE
+MIT License
+...
+
+# ----------------------------------------
+
+# logo.png
+[Binary file - 43.7 KB - content omitted]
 
 # ----------------------------------------
 
 # cmd/snap/main.go
 package main
 ...
-
-# logo.png
-[Binary file - 45.2 KB - content omitted]
-
-# internal/snapshot/snapshot.go
-package snapshot
-...
 ```
 
-Each file section starts with `# relative/path/from/root` followed by either:
+**Summary section:**
 
-- File contents (for text files)
-- Binary file metadata with size (for binary files)
+- Generation timestamp
+- Total file count (text and binary breakdown)
+- Total lines in the snapshot
+
+**File index:**
+
+- `filename [start-end]` - Line range in the snapshot for quick navigation
+- `(N lines, size)` - For text files
+- `(binary, size)` - For binary files
+
+**File sections:**
+
+- Each section starts with `# relative/path/from/root`
+- Text files: full content
+- Binary files: metadata with size (content omitted)
+
+**Navigation:**
+Use the file index to quickly locate files by line number in the snapshot.
 
 ### Safety Features
 
@@ -140,6 +186,39 @@ Each file section starts with `# relative/path/from/root` followed by either:
 - Custom output paths require explicit `--output` flag to overwrite existing files
 - Output file automatically excluded from snapshot (prevents recursion)
 - Binary files excluded by default to prevent corruption
+
+## Use Cases
+
+- Provide complete codebase context to LLMs with easy file navigation
+- Generate documentation from source with line-level references
+- Code review preparation with exact file locations
+- Project snapshots for archival with metadata
+- Quick project structure overview via the file index
+
+## Working with AI Tools
+
+Include these instructions to help AI assistants understand how to work with snapshots effectively:
+
+```
+## Working with Repository Snapshots
+
+Snapshots were generated with [snap](https://github.com/neox5/snap).
+
+**Rules for working with snap.txt:**
+
+- snap.txt is a READ-ONLY reference document
+- DO NOT modify snap.txt directly
+- DO NOT create updated versions of snap.txt
+- Changes must target actual source files in their original locations
+- User will regenerate snap.txt by running snap after changes
+
+**How to use snap.txt:**
+
+1. File index is at the top with line ranges
+2. Each file section starts with # filepath
+3. Binary files show size metadata instead of content
+4. Git log (if present) shows recent commits
+```
 
 ## Installation
 
@@ -195,14 +274,6 @@ sudo mv dist/snap /usr/local/bin/snap
 ```bash
 snap --version
 ```
-
-## Use Cases
-
-- Provide complete codebase context to LLMs
-- Generate documentation from source
-- Code review preparation
-- Project archival and snapshots
-- Quick sharing of entire project structure
 
 ## Advanced Examples
 
@@ -310,4 +381,4 @@ The `post-release` script will:
 
 ## License
 
-MIT License – see [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE) file for details.
