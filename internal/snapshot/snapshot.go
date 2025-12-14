@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/neox5/snap/internal/file"
 	"github.com/neox5/snap/internal/gitlog"
@@ -33,8 +34,8 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		snap.GitLogLines = gitLogData.Lines
 	}
 
-	// Collect files
-	discovered, err := file.Collect(
+	// Collect and load files
+	files, textFiles, binaryFiles, err := file.Collect(
 		absSourceDir,
 		absOutput,
 		cfg.ExcludePatterns,
@@ -45,83 +46,72 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 	if err != nil {
 		return nil, err
 	}
+	snap.Files = files
 
-	// Load file content
-	for _, df := range discovered {
-		f, err := file.New(
-			df.RelPath,
-			df.FullPath,
-			df.Size,
-			df.IsBinary,
-		)
-		if err != nil {
-			return nil, err
-		}
-		snap.Files = append(snap.Files, f)
-	}
+	// Prepare summary metadata
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	totalFiles := len(files)
+	totalLines := 0 // Will be set after layout construction
 
-	// Build layout
-	layout := []Content{}
+	// Build layout (single pass)
+	var layout []Content
+
+	// Summary section (with mutable totalLines pointer)
+	layout = append(layout,
+		newSummary(timestamp, totalFiles, textFiles, binaryFiles, &totalLines),
+		newEmptyLine(),
+	)
+
+	// Index section
+	layout = append(layout,
+		newHeader("File Index"),
+		newIndex(snap.Files),
+		newEmptyLine(),
+		newSeparator(),
+		newEmptyLine(),
+	)
 
 	// Git log section (if present)
 	if len(snap.GitLogLines) > 0 {
 		layout = append(layout,
-			Header("Git Log (git adog)"),
-			GitLogContent(snap.GitLogLines),
-			EmptyLine(),
-			Separator(),
-			EmptyLine(),
+			newHeader("Git Log (git adog)"),
+			newGitLog(snap.GitLogLines),
+			newEmptyLine(),
+			newSeparator(),
+			newEmptyLine(),
 		)
 	}
-
-	// File list section
-	layout = append(layout,
-		Header("Files"),
-		FileListContent(snap.Files),
-		EmptyLine(),
-		Separator(),
-		EmptyLine(),
-	)
 
 	// File contents sections
 	for i, f := range snap.Files {
 		layout = append(layout,
-			Header(f.RelPath),
-			FileContent(f),
+			newHeader(f.RelPath),
+			newFileContent(f),
 		)
 
 		// Add spacing only if not the last file
 		if i < len(snap.Files)-1 {
 			layout = append(layout,
-				EmptyLine(),
-				EmptyLine(),
+				newEmptyLine(),
+				newEmptyLine(),
 			)
 		}
 	}
 
-	snap.Layout = layout
-
-	// Calculate line ranges
-	snap.calculateLineRanges()
-
-	return snap, nil
-}
-
-// calculateLineRanges calculates and sets StartLine for all files
-func (s *Snapshot) calculateLineRanges() {
+	// Assign file StartLine and calculate totalLines
 	currentLine := 1
-
-	// Iterate through layout and track line positions
-	for _, content := range s.Layout {
-		// Check if this is a fileContent to record its position
+	for _, content := range layout {
 		if fc, ok := content.(fileContent); ok {
-			// The current line is where this file's content starts
 			fc.File.StartLine = currentLine
 		}
-
-		// Advance current line by this content's line count
 		currentLine += content.LineCount()
 	}
+
+	totalLines = currentLine - 1 // -1 because we started at 1
+
+	snap.Layout = layout
+
+	return snap, nil
 }
 
 // WriteTo writes the snapshot to the output

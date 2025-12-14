@@ -1,42 +1,34 @@
 package file
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 
 	"github.com/neox5/snap/internal/ignore"
 )
 
-// DiscoveredFile holds file metadata before content is loaded
-type DiscoveredFile struct {
-	RelPath  string
-	FullPath string
-	Size     int64
-	IsBinary bool
-}
-
-// Collect discovers and analyzes files to include in the snapshot
-func Collect(sourceDir, outputPath string, excludePatterns, includePatterns, forceTextPatterns, forceBinaryPatterns []string) ([]DiscoveredFile, error) {
+// Collect discovers, analyzes, and loads files to include in the snapshot
+// Returns: files, textCount, binaryCount, error
+func Collect(sourceDir, outputPath string, excludePatterns, includePatterns, forceTextPatterns, forceBinaryPatterns []string) ([]*File, int, int, error) {
 	absSourceDir, err := filepath.Abs(sourceDir)
 	if err != nil {
-		return nil, fmt.Errorf("cannot resolve source directory: %w", err)
+		return nil, 0, 0, fmt.Errorf("cannot resolve source directory: %w", err)
 	}
 
 	absOutput, err := filepath.Abs(outputPath)
 	if err != nil {
-		return nil, fmt.Errorf("cannot resolve output path: %w", err)
+		return nil, 0, 0, fmt.Errorf("cannot resolve output path: %w", err)
 	}
 
 	matchers, err := ignore.NewMatchers(absSourceDir, excludePatterns, includePatterns)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
-	var discovered []DiscoveredFile
+	var files []*File
+	var textCount, binaryCount int
 
 	err = filepath.WalkDir(absSourceDir, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -88,33 +80,27 @@ func Collect(sourceDir, outputPath string, excludePatterns, includePatterns, for
 			}
 		}
 
-		discovered = append(discovered, DiscoveredFile{
-			RelPath:  relUnix,
-			FullPath: path,
-			Size:     fileSize,
-			IsBinary: isBinary,
-		})
+		// Create and load file immediately
+		f, err := New(relUnix, path, fileSize, isBinary)
+		if err != nil {
+			return err
+		}
+
+		files = append(files, f)
+
+		if isBinary {
+			binaryCount++
+		} else {
+			textCount++
+		}
 
 		return nil
 	})
-
-	return discovered, err
-}
-
-// CountLinesInFile counts lines in a file by path
-func CountLinesInFile(path string) (int, error) {
-	f, err := os.Open(path)
 	if err != nil {
-		return 0, err
+		return nil, 0, 0, err
 	}
-	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	count := 0
-	for scanner.Scan() {
-		count++
-	}
-	return count, scanner.Err()
+	return files, textCount, binaryCount, nil
 }
 
 func samePath(a, b string) bool {
