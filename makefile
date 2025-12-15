@@ -18,7 +18,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 # LDFLAGS: Set version + strip debug symbols for smaller binaries
 # -s: omit symbol table
 # -w: omit DWARF debug info
-# Result: ~40-50% size reduction (5-6MB -> 2.5-3.5MB)
+# Result: ~40-50% size reduction 
 LDFLAGS := -s -w -X '$(MODULE_PATH)/internal/version.Version=$(VERSION)'
 
 .PHONY: all build build-local clean print-version release post-release
