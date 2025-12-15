@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	cli "github.com/urfave/cli/v3"
 
@@ -43,6 +44,10 @@ If DIRECTORY is omitted, '.' is used.`,
 				Name:  "dry-run",
 				Usage: "Print files that would be included without creating output",
 			},
+			&cli.BoolFlag{
+				Name:  "silent",
+				Usage: "Suppress all output (exit codes only)",
+			},
 			&cli.StringSliceFlag{
 				Name:  "force-text",
 				Usage: "Force files matching glob pattern to be treated as text (repeatable)",
@@ -58,6 +63,8 @@ If DIRECTORY is omitted, '.' is used.`,
 			if c.NArg() > 0 {
 				sourceDir = c.Args().First()
 			}
+
+			silent := c.Bool("silent")
 
 			cfg := snapshot.Config{
 				SourceDir:           sourceDir,
@@ -76,14 +83,18 @@ If DIRECTORY is omitted, '.' is used.`,
 				return err
 			}
 
+			start := time.Now()
+
 			snap, err := snapshot.Build(ctx, cfg, absSourceDir, absOutput)
 			if err != nil {
 				return err
 			}
 
 			if cfg.DryRun {
-				for _, f := range snap.Files {
-					fmt.Println(f.RelPath)
+				if !silent {
+					for _, f := range snap.Files {
+						fmt.Println(f.RelPath)
+					}
 				}
 				return nil
 			}
@@ -98,7 +109,12 @@ If DIRECTORY is omitted, '.' is used.`,
 				return err
 			}
 
-			fmt.Printf("Files concatenated to %s\n", absOutput)
+			elapsed := time.Since(start)
+
+			if !silent {
+				fmt.Printf("Snapshot created: %s (%s)\n", absOutput, formatDuration(elapsed))
+			}
+
 			return nil
 		},
 	}
@@ -106,4 +122,13 @@ If DIRECTORY is omitted, '.' is used.`,
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		log.Fatalf("snp: %v", err)
 	}
+}
+
+// formatDuration formats duration as milliseconds or seconds with appropriate precision
+func formatDuration(d time.Duration) string {
+	ms := d.Milliseconds()
+	if ms < 1000 {
+		return fmt.Sprintf("%dms", ms)
+	}
+	return fmt.Sprintf("%.1fs", d.Seconds())
 }
