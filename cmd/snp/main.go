@@ -25,8 +25,8 @@ If DIRECTORY is omitted, '.' is used.`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "output",
-				Usage: "Set output file path (default: ./snp.txt)",
-				Value: "snp.txt",
+				Usage: "Set output file path",
+				Value: snapshot.DefaultOutputName,
 			},
 			&cli.StringSliceFlag{
 				Name:  "include",
@@ -73,7 +73,6 @@ If DIRECTORY is omitted, '.' is used.`,
 				ExcludePatterns:     c.StringSlice("exclude"),
 				IncludeGitLog:       !c.Bool("exclude-git-log"),
 				DryRun:              c.Bool("dry-run"),
-				OutputExplicit:      c.IsSet("output"),
 				ForceTextPatterns:   c.StringSlice("force-text"),
 				ForceBinaryPatterns: c.StringSlice("force-binary"),
 			}

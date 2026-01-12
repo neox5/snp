@@ -8,7 +8,6 @@ type Config struct {
 	ExcludePatterns     []string
 	IncludeGitLog       bool
 	DryRun              bool
-	OutputExplicit      bool
 	ForceTextPatterns   []string
 	ForceBinaryPatterns []string
 }

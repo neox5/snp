@@ -6,24 +6,20 @@ import (
 	"path/filepath"
 )
 
-func resolveOutputPath(outputPath string) (absOutput string, defaultAbs string, err error) {
-	const defaultName = "snp.txt"
+// DefaultOutputName is the default snapshot output filename
+const DefaultOutputName = "snapshot.snp"
 
-	defaultAbs, err = filepath.Abs(defaultName)
-	if err != nil {
-		return "", "", fmt.Errorf("cannot resolve default output path: %w", err)
-	}
-
+func resolveOutputPath(outputPath string) (absOutput string, err error) {
 	if outputPath == "" {
-		outputPath = defaultName
+		outputPath = DefaultOutputName
 	}
 
 	absOutput, err = filepath.Abs(outputPath)
 	if err != nil {
-		return "", "", fmt.Errorf("cannot resolve output path %q: %w", outputPath, err)
+		return "", fmt.Errorf("cannot resolve output path %q: %w", outputPath, err)
 	}
 
-	return absOutput, defaultAbs, nil
+	return absOutput, nil
 }
 
 // ValidateAndResolve validates the config and resolves paths
@@ -43,16 +39,9 @@ func ValidateAndResolve(cfg Config) (absSourceDir, absOutput string, err error) 
 	}
 
 	// Resolve output path
-	absOutput, defaultAbs, err := resolveOutputPath(cfg.OutputPath)
+	absOutput, err = resolveOutputPath(cfg.OutputPath)
 	if err != nil {
 		return "", "", err
-	}
-
-	// Check overwrite semantics (skip in dry-run mode)
-	if !cfg.DryRun && absOutput != defaultAbs && !cfg.OutputExplicit {
-		if _, err := os.Stat(absOutput); err == nil {
-			return "", "", fmt.Errorf("refusing to overwrite existing file %q; use --output to override", absOutput)
-		}
 	}
 
 	return absSourceDir, absOutput, nil

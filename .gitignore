@@ -1,5 +1,5 @@
 # build folder
 dist
 
-# snp file
-snp.txt
+# snapshot files
+**/*.snp

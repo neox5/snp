@@ -30,8 +30,7 @@ var DefaultPatterns = []string{
 	"*.tmp",
 
 	// Snapshot files themselves
-	"**/snp.txt",
-	"**/*.snp.txt",
+	"**/*.snp",
 }
 
 // Matchers holds compiled ignore and include patterns with proper precedence.
