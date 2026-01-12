@@ -27,21 +27,21 @@ cd /path/to/your/project
 snp
 ```
 
-Creates `./snp.txt` with all project files concatenated.
+Creates `./snapshot.snp` with all project files concatenated.
 
 ## Usage
 
 ### Basic Usage
 
 ```bash
-snp                    # Create snp.txt in current directory
-snp /path/to/project   # Create snp.txt from specified directory
+snp                    # Create snapshot.snp in current directory
+snp /path/to/project   # Create snapshot.snp from specified directory
 ```
 
 ### Output Control
 
 ```bash
-snp --output custom.txt              # Custom output path
+snp --output custom.snp              # Custom output path
 snp --exclude-git-log                # Omit Git log section
 snp --dry-run                        # List files without creating output
 ```
@@ -103,7 +103,7 @@ snp --force-text "**/*.config" --force-binary "data/secret.config"
 ### What Gets Excluded
 
 - Directories: `.git/`, `node_modules/`, `.venv/`, `dist/`, `build/`, `target/`, `vendor/`
-- Patterns: `*.log`, `*.tmp`, `**/snp.txt`
+- Patterns: `*.log`, `*.tmp`, `**/*.snp`
 - Files in your `.gitignore`
 - Binary files (detected automatically or via `--force-binary`)
 - Empty files (treated as binary)
@@ -138,8 +138,8 @@ logo.png [1746-1746] (binary, 43.7 KB)
 # build folder
 dist
 
-# snp file
-snp.txt
+# snapshot files
+**/*.snp
 
 # ----------------------------------------
 
@@ -182,8 +182,8 @@ Use the file index to quickly locate files by line number in the snapshot.
 
 ### Safety Features
 
-- Default `./snp.txt` always overwrites (safe for repeated runs)
-- Custom output paths require explicit `--output` flag to overwrite existing files
+- Default `./snapshot.snp` overwrites without warning (standard Unix behavior)
+- Custom output paths also overwrite without warning
 - Output file automatically excluded from snapshot (prevents recursion)
 - Binary files excluded by default to prevent corruption
 
@@ -204,15 +204,15 @@ Include these instructions to help AI assistants understand how to work with sna
 
 Snapshots were generated with [snp](https://github.com/neox5/snp).
 
-**Rules for working with snp.txt:**
+**Rules for working with snapshot files:**
 
-- snp.txt is a READ-ONLY reference document
-- DO NOT modify snp.txt directly
-- DO NOT create updated versions of snp.txt
+- Snapshot files are READ-ONLY reference documents
+- DO NOT modify snapshot files directly
+- DO NOT create updated versions of snapshot files
 - Changes must target actual source files in their original locations
-- User will regenerate snp.txt by running snp after changes
+- User will regenerate snapshot by running snp after changes
 
-**How to use snp.txt:**
+**How to use snapshot files:**
 
 1. File index is at the top with line ranges
 2. Each file section starts with # filepath
@@ -299,7 +299,7 @@ snp --exclude "**/*_test.go" --exclude "**/generated/**"
 ### Custom output with specific includes
 
 ```bash
-snp --output docs-snapshot.txt --include "docs/**" --include "*.md"
+snp --output docs-snapshot.snp --include "docs/**" --include "*.md"
 ```
 
 ### Snapshot without version control info
@@ -344,6 +344,19 @@ snp --force-text "data/config.bin"
 snp --force-text "**/*.log"  # Include log files as text
 ```
 
+### Multiple snapshots in one project
+
+```bash
+# Full project snapshot
+snp --output full.snp
+
+# Documentation only
+snp --output docs.snp --include "docs/**" --include "*.md"
+
+# Source code only
+snp --output src.snp --include "src/**" --include "cmd/**"
+```
+
 ## Release
 
 ### Creating a Release
@@ -381,4 +394,4 @@ The `post-release` script will:
 
 ## License
 
-MIT License – see [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE) file for details.
