@@ -46,24 +46,78 @@ snp --exclude-git-log                # Omit Git log section
 snp --dry-run                        # List files without creating output
 ```
 
-### File Filtering
+## Modes
+
+snp operates in two mutually exclusive modes.
+
+### Mode 1 — Traversal (default)
+
+Recursively walks the directory tree and filters files by pattern.
 
 ```bash
 snp --include "src/**/*.go"                    # Include only Go files in src/
 snp --exclude "**/*_test.go"                   # Exclude test files
-snp --include "*.log" --exclude "secret.log"   # Combine filters
-snp --exclude "*.tmp" --exclude "*.log"        # Multiple exclude patterns
-snp --include "**/*.go" --include "**/*.md"    # Multiple include patterns
+snp --include "**/*.go" --exclude "**/*_test.go" --include "internal/auth/auth_test.go"
+snp --no-defaults --include "**/*.md"          # Disable defaults, include only markdown
+snp --show-defaults                            # Print default exclude patterns and exit
 ```
 
-**Note:** Both `--include` and `--exclude` flags can be specified multiple times.
+**Filter evaluation:**
 
-**Filter precedence** (highest to lowest):
+Defaults (gitignore + default excludes) are applied as implicit first rules.
+`--include` and `--exclude` flags are then evaluated in the order they appear.
+The last matching rule wins.
 
-1. `--exclude` patterns (final, cannot be overridden)
-2. `--include` patterns (override defaults and .gitignore)
-3. `.gitignore` patterns
-4. Default excludes (node_modules/, .git/, dist/, etc.)
+```
+defaults → --include/--exclude (in order, last match wins)
+```
+
+`--no-defaults` removes the implicit first rules entirely, leaving only
+explicit flags.
+
+Both `--include` and `--exclude` are repeatable and can be interleaved:
+
+```bash
+# All Go except tests, but keep one specific test
+snp --include "**/*.go" --exclude "**/*_test.go" --include "internal/auth/auth_test.go"
+```
+
+### Mode 2 — Pick
+
+Directly addresses specific files by exact path or glob pattern.
+No traversal, no defaults, no gitignore applied.
+
+```bash
+snp --pick "cmd/main.go"
+snp --pick "Anthropic/claude-code.md" --pick "OpenAI/o3.md"
+snp --pick "Anthropic/**/*.md"
+snp --pick "/etc/nginx/nginx.conf"
+```
+
+`--pick` is repeatable. Relative paths and globs resolve against the
+directory argument (default `.`). Absolute paths are shown as-is in
+the snapshot.
+
+`--pick` cannot be combined with `--include`, `--exclude`, or `--no-defaults`.
+
+**Cross-repo example:**
+
+```bash
+# From a parent directory containing multiple repos
+snp --pick "repo-a/cmd/main.go" --pick "repo-b/cmd/main.go" --pick "repo-c/cmd/main.go"
+```
+
+## File Filtering (Mode 1)
+
+### Default Excludes
+
+Run `snp --show-defaults` to see the full list. Includes:
+
+- Directories: `.git/`, `node_modules/`, `.venv/`, `dist/`, `build/`, `target/`, `vendor/`
+- Patterns: `*.log`, `*.tmp`, `**/*.snp`
+- Files in your `.gitignore`
+
+Use `--no-defaults` to disable all of the above.
 
 ### Binary File Handling
 
@@ -95,12 +149,11 @@ snp --force-text "**/*.config" --force-binary "data/secret.config"
 
 ### What Gets Included
 
-- All text files not matching exclude patterns
+- All text files not excluded by defaults or filter rules
 - Git log (if `.git/` exists, unless `--exclude-git-log` is used)
-- Files matching `--include` patterns override .gitignore
-- Files forced as text via `--force-text`
+- Files matched by `--pick` (Mode 2)
 
-### What Gets Excluded
+### What Gets Excluded (Mode 1 defaults)
 
 - Directories: `.git/`, `node_modules/`, `.venv/`, `dist/`, `build/`, `target/`, `vendor/`
 - Patterns: `*.log`, `*.tmp`, `**/*.snp`
@@ -129,7 +182,6 @@ logo.png [1746-1746] (binary, 43.7 KB)
 
 # Git Log (git adog)
 * f79aeb1 (HEAD -> main) add snapshot index and refactor layout construction
-* 653b8ab refactor snapshot creation and rendering
 ...
 
 # ----------------------------------------
@@ -137,14 +189,6 @@ logo.png [1746-1746] (binary, 43.7 KB)
 # .gitignore
 # build folder
 dist
-
-# snapshot files
-**/*.snp
-
-# ----------------------------------------
-
-# LICENSE
-MIT License
 ...
 
 # ----------------------------------------
@@ -158,27 +202,6 @@ MIT License
 package main
 ...
 ```
-
-**Summary section:**
-
-- Generation timestamp
-- Total file count (text and binary breakdown)
-- Total lines in the snapshot
-
-**File index:**
-
-- `filename [start-end]` - Line range in the snapshot for quick navigation
-- `(N lines, size)` - For text files
-- `(binary, size)` - For binary files
-
-**File sections:**
-
-- Each section starts with `# relative/path/from/root`
-- Text files: full content
-- Binary files: metadata with size (content omitted)
-
-**Navigation:**
-Use the file index to quickly locate files by line number in the snapshot.
 
 ### Safety Features
 
@@ -194,6 +217,7 @@ Use the file index to quickly locate files by line number in the snapshot.
 - Code review preparation with exact file locations
 - Project snapshots for archival with metadata
 - Quick project structure overview via the file index
+- Cherry-pick files from multiple repos into one snapshot
 
 ## Working with AI Tools
 
@@ -308,6 +332,20 @@ snp --output docs-snapshot.snp --include "docs/**" --include "*.md"
 snp --exclude-git-log
 ```
 
+### Disable defaults entirely
+
+```bash
+# Only what you explicitly include
+snp --no-defaults --include "**/*.go" --include "**/*.md"
+```
+
+### Ordered rules — rescue a file from exclusion
+
+```bash
+# Include all Go, exclude tests, but keep one specific test
+snp --include "**/*.go" --exclude "**/*_test.go" --include "internal/auth/auth_test.go"
+```
+
 ### Force specific file types
 
 ```bash
@@ -316,32 +354,19 @@ snp --force-text "**/.env" --force-text "**/.editorconfig"
 
 # Force .dat files to be binary (even if they contain text)
 snp --force-binary "**/*.dat"
-
-# Combine with other filters
-snp --include "config/**" --force-text "**/.env"
 ```
 
-### Verify filtering before snapshot
+### Cherry-pick files across repos
 
 ```bash
-# Check which files will be included
-snp --dry-run --exclude "**/*_test.go"
+# From parent directory — no traversal, exact files only
+snp --pick "repo-a/cmd/main.go" --pick "repo-b/cmd/main.go"
 
-# If satisfied, create the snapshot
-snp --exclude "**/*_test.go"
-```
+# Using globs
+snp --pick "repo-a/**/*.go" --pick "repo-b/README.md"
 
-### Handle edge cases with force flags
-
-```bash
-# Custom binary format that looks like text
-snp --force-binary "**/*.myformat"
-
-# Text file with unusual extension
-snp --force-text "data/config.bin"
-
-# Force takes precedence over detection
-snp --force-text "**/*.log"  # Include log files as text
+# Mix relative and absolute
+snp --pick "repo-a/README.md" --pick "/etc/nginx/nginx.conf"
 ```
 
 ### Multiple snapshots in one project

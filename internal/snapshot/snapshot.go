@@ -8,6 +8,7 @@ import (
 
 	"github.com/neox5/snp/internal/file"
 	"github.com/neox5/snp/internal/gitlog"
+	"github.com/neox5/snp/internal/pick"
 	"github.com/neox5/snp/internal/writer"
 )
 
@@ -25,44 +26,63 @@ type GitLogLines []string
 func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput string) (*Snapshot, error) {
 	snap := &Snapshot{}
 
-	// Collect git log if enabled
-	if cfg.IncludeGitLog && gitlog.HasRepo(absSourceDir) {
-		gitLogData, err := gitlog.Collect(ctx, absSourceDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to collect git log: %w", err)
+	var files []*file.File
+	var textFiles, binaryFiles int
+	var err error
+
+	switch cfg.Mode {
+	case ModeTraversal:
+		// Collect git log if enabled
+		if cfg.IncludeGitLog && gitlog.HasRepo(absSourceDir) {
+			gitLogData, err := gitlog.Collect(ctx, absSourceDir)
+			if err != nil {
+				return nil, fmt.Errorf("failed to collect git log: %w", err)
+			}
+			snap.GitLogLines = gitLogData.Lines
 		}
-		snap.GitLogLines = gitLogData.Lines
+
+		files, textFiles, binaryFiles, err = file.Collect(
+			absSourceDir,
+			absOutput,
+			cfg.NoDefaults,
+			cfg.FilterRules,
+			cfg.ForceTextPatterns,
+			cfg.ForceBinaryPatterns,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+	case ModePick:
+		files, textFiles, binaryFiles, err = pick.Collect(
+			absSourceDir,
+			cfg.PickPaths,
+			cfg.ForceTextPatterns,
+			cfg.ForceBinaryPatterns,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, fmt.Errorf("unknown mode: %d", cfg.Mode)
 	}
 
-	// Collect and load files
-	files, textFiles, binaryFiles, err := file.Collect(
-		absSourceDir,
-		absOutput,
-		cfg.ExcludePatterns,
-		cfg.IncludePatterns,
-		cfg.ForceTextPatterns,
-		cfg.ForceBinaryPatterns,
-	)
-	if err != nil {
-		return nil, err
-	}
 	snap.Files = files
 
 	// Prepare summary metadata
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	totalFiles := len(files)
-	totalLines := 0 // Will be set after layout construction
+	totalLines := 0
 
-	// Build layout (single pass)
+	// Build layout
 	var layout []Content
 
-	// Summary section (with mutable totalLines pointer)
 	layout = append(layout,
 		newSummary(timestamp, totalFiles, textFiles, binaryFiles, &totalLines),
 		newEmptyLine(),
 	)
 
-	// Index section
 	layout = append(layout,
 		newHeader("File Index"),
 		newIndex(snap.Files),
@@ -71,7 +91,6 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		newEmptyLine(),
 	)
 
-	// Git log section (if present)
 	if len(snap.GitLogLines) > 0 {
 		layout = append(layout,
 			newHeader("Git Log (git adog)"),
@@ -82,14 +101,11 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		)
 	}
 
-	// File contents sections
 	for i, f := range snap.Files {
 		layout = append(layout,
 			newHeader(f.RelPath),
 			newFileContent(f),
 		)
-
-		// Add spacing only if not the last file
 		if i < len(snap.Files)-1 {
 			layout = append(layout,
 				newEmptyLine(),
@@ -98,7 +114,6 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		}
 	}
 
-	// Assign file StartLine and calculate totalLines
 	currentLine := 1
 	for _, content := range layout {
 		if fc, ok := content.(fileContent); ok {
@@ -107,8 +122,7 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		currentLine += content.LineCount()
 	}
 
-	totalLines = currentLine - 1 // -1 because we started at 1
-
+	totalLines = currentLine - 1
 	snap.Layout = layout
 
 	return snap, nil

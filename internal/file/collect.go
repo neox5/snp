@@ -6,12 +6,12 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/neox5/snp/internal/ignore"
+	"github.com/neox5/snp/internal/filter"
 )
 
-// Collect discovers, analyzes, and loads files to include in the snapshot
+// Collect discovers, analyzes, and loads files to include in the snapshot.
 // Returns: files, textCount, binaryCount, error
-func Collect(sourceDir, outputPath string, excludePatterns, includePatterns, forceTextPatterns, forceBinaryPatterns []string) ([]*File, int, int, error) {
+func Collect(sourceDir, outputPath string, noDefaults bool, filterRules []filter.Rule, forceTextPatterns, forceBinaryPatterns []string) ([]*File, int, int, error) {
 	absSourceDir, err := filepath.Abs(sourceDir)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("cannot resolve source directory: %w", err)
@@ -22,7 +22,7 @@ func Collect(sourceDir, outputPath string, excludePatterns, includePatterns, for
 		return nil, 0, 0, fmt.Errorf("cannot resolve output path: %w", err)
 	}
 
-	matchers, err := ignore.NewMatchers(absSourceDir, excludePatterns, includePatterns)
+	matcher, err := filter.New(absSourceDir, noDefaults, filterRules)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -56,7 +56,7 @@ func Collect(sourceDir, outputPath string, excludePatterns, includePatterns, for
 		}
 		relUnix := filepath.ToSlash(relPath)
 
-		if !matchers.ShouldInclude(relUnix) {
+		if !matcher.ShouldInclude(relUnix) {
 			return nil
 		}
 
@@ -67,20 +67,16 @@ func Collect(sourceDir, outputPath string, excludePatterns, includePatterns, for
 		fileSize := info.Size()
 
 		var isBinary bool
-
-		// Check force overrides
 		isBinaryOverride, overridden := CheckForceOverride(relUnix, forceTextPatterns, forceBinaryPatterns)
 		if overridden {
 			isBinary = isBinaryOverride
 		} else {
-			// Detect binary status
 			isBinary, err = DetectBinary(path, fileSize)
 			if err != nil {
 				return nil
 			}
 		}
 
-		// Create and load file immediately
 		f, err := New(relUnix, path, fileSize, isBinary)
 		if err != nil {
 			return err
