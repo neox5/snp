@@ -18,10 +18,10 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 # LDFLAGS: Set version + strip debug symbols for smaller binaries
 # -s: omit symbol table
 # -w: omit DWARF debug info
-# Result: ~40-50% size reduction 
+# Result: ~40-50% size reduction
 LDFLAGS := -s -w -X '$(MODULE_PATH)/internal/version.Version=$(VERSION)'
 
-.PHONY: all build build-local clean print-version release post-release
+.PHONY: all build build-local clean test lint print-version release post-release
 
 all: build
 
@@ -54,7 +54,18 @@ build-local: clean
 	go build -ldflags "$(LDFLAGS)" -o "$(DIST_DIR)/$(BINARY)" $(CMD_PKG)
 
 # ---------------------------------------------------------------------
-# Full release verification (tag, tests, binaries, checksums)
+# Test and lint
+# ---------------------------------------------------------------------
+
+test:
+	go test ./...
+
+lint:
+	go vet ./...
+	go fmt ./...
+
+# ---------------------------------------------------------------------
+# Release — verify locally, push tag, GitHub Actions publishes
 # ---------------------------------------------------------------------
 
 release:

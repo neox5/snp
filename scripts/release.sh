@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- Configuration -----------------------------------------------------------
+export MAKEFLAGS="--no-print-directory"
 
-BINARY="snp"
-MODULE="github.com/neox5/snp"
-DIST_DIR="dist"
+# --- Load configuration ------------------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ ! -f "$SCRIPT_DIR/release.env" ]; then
+  echo "ERROR: release.env not found" >&2
+  exit 1
+fi
+
+source "$SCRIPT_DIR/release.env"
 
 # --- Helpers -----------------------------------------------------------------
 
@@ -19,6 +27,8 @@ info() {
 }
 
 # --- Preconditions -----------------------------------------------------------
+
+cd "$PROJECT_ROOT"
 
 info "checking git state"
 
@@ -38,7 +48,6 @@ go test ./...
 # --- Build -------------------------------------------------------------------
 
 info "building release artifacts"
-make clean
 make build
 
 # --- Verify host-native binary version ---------------------------------------
@@ -71,33 +80,18 @@ fi
 info "verifying sha256 checksums"
 
 for sum in "$DIST_DIR"/*.sha256; do
-  ( cd "$DIST_DIR" && sha256sum -c "$(basename "$sum")" ) \
-    || fail "checksum verification failed for $sum"
+  (cd "$DIST_DIR" && sha256sum -c "$(basename "$sum")") ||
+    fail "checksum verification failed for $sum"
 done
 
-# --- Final Instructions ------------------------------------------------------
+# --- Push --------------------------------------------------------------------
 
-cat <<EOF
+info "pushing branch and tag"
+git push origin main
+git push origin "$CURRENT_TAG"
 
-✅ Release artifacts validated.
-
-Next steps:
-
-1. Push tag and branch:
-   git push origin main
-   git push origin $CURRENT_TAG
-
-2. Create GitHub release:
-   - Tag: $CURRENT_TAG
-   - Upload all files from:
-       $DIST_DIR/
-   - Publish release
-
-3. (Optional) Post-release installation check on a clean system:
-   - Download a binary + .sha256 from GitHub Releases
-   - Verify:
-       sha256sum -c snp-<os>-<arch>.sha256
-   - Run:
-       ./snp-<os>-<arch> --version   # should print $CURRENT_TAG
-
-EOF
+echo
+echo "✅ Release artifacts validated and tag pushed."
+echo "✅ GitHub Actions will build and publish the release automatically."
+echo
+echo "Monitor the release at: https://github.com/${OWNER_REPO}/actions"

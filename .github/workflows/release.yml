@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build binaries
+        run: make build
+
+      - name: Verify binary version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "Tag: $TAG_NAME"
+
+          HOST_GOOS=$(go env GOOS)
+          HOST_GOARCH=$(go env GOARCH)
+          HOST_BIN="dist/snp-${HOST_GOOS}-${HOST_GOARCH}"
+
+          if [ "$HOST_GOOS" = "windows" ]; then
+            HOST_BIN="${HOST_BIN}.exe"
+          fi
+
+          if [ ! -x "$HOST_BIN" ]; then
+            echo "ERROR: host binary not found: $HOST_BIN"
+            exit 1
+          fi
+
+          VERSION_OUTPUT=$("$HOST_BIN" --version)
+          BINARY_VERSION="${VERSION_OUTPUT##* }"
+
+          echo "Binary version: $BINARY_VERSION"
+
+          if [ "$BINARY_VERSION" != "$TAG_NAME" ]; then
+            echo "ERROR: version mismatch (expected $TAG_NAME, got $BINARY_VERSION)"
+            exit 1
+          fi
+
+          echo "✅ Version verification passed"
+
+      - name: Extract tag name
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Check for release notes
+        id: notes
+        run: |
+          if [ -f ".release-notes/${{ steps.tag.outputs.tag }}.md" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release with notes
+        if: steps.notes.outputs.exists == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body_path: .release-notes/${{ steps.tag.outputs.tag }}.md
+          draft: false
+          prerelease: false
+
+      - name: Create GitHub Release without notes
+        if: steps.notes.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
