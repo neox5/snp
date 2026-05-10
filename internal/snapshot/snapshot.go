@@ -32,7 +32,6 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 
 	switch cfg.Mode {
 	case ModeTraversal:
-		// Collect git log if enabled
 		if cfg.IncludeGitLog && gitlog.HasRepo(absSourceDir) {
 			gitLogData, err := gitlog.Collect(ctx, absSourceDir)
 			if err != nil {
@@ -44,7 +43,6 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		files, textFiles, binaryFiles, err = file.Collect(
 			absSourceDir,
 			absOutput,
-			cfg.NoDefaults,
 			cfg.FilterRules,
 			cfg.ForceTextPatterns,
 			cfg.ForceBinaryPatterns,
@@ -70,12 +68,10 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 
 	snap.Files = files
 
-	// Prepare summary metadata
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	totalFiles := len(files)
 	totalLines := 0
 
-	// Build layout
 	var layout []Content
 
 	layout = append(layout,

@@ -11,7 +11,7 @@ import (
 
 // Collect discovers, analyzes, and loads files to include in the snapshot.
 // Returns: files, textCount, binaryCount, error
-func Collect(sourceDir, outputPath string, noDefaults bool, filterRules []filter.Rule, forceTextPatterns, forceBinaryPatterns []string) ([]*File, int, int, error) {
+func Collect(sourceDir, outputPath string, filterRules []filter.Rule, forceTextPatterns, forceBinaryPatterns []string) ([]*File, int, int, error) {
 	absSourceDir, err := filepath.Abs(sourceDir)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("cannot resolve source directory: %w", err)
@@ -22,7 +22,7 @@ func Collect(sourceDir, outputPath string, noDefaults bool, filterRules []filter
 		return nil, 0, 0, fmt.Errorf("cannot resolve output path: %w", err)
 	}
 
-	matcher, err := filter.New(absSourceDir, noDefaults, filterRules)
+	matcher, err := filter.New(absSourceDir, filterRules)
 	if err != nil {
 		return nil, 0, 0, err
 	}

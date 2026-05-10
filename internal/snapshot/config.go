@@ -17,11 +17,9 @@ type Config struct {
 	OutputPath    string
 	IncludeGitLog bool
 	DryRun        bool
-	ShowDefaults  bool
 
 	// Mode 1 — Traversal
 	FilterRules         []filter.Rule
-	NoDefaults          bool
 	ForceTextPatterns   []string
 	ForceBinaryPatterns []string
 

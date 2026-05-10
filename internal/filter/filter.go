@@ -1,5 +1,5 @@
-// Package filter aggregates default and CLI rules into an ordered matcher
-// that decides whether a given path should be included in a snapshot.
+// Package filter aggregates ordered rules into a matcher that decides
+// whether a given path should be included in a snapshot.
 package filter
 
 import (
@@ -11,7 +11,7 @@ import (
 	gitignore "github.com/sabhiram/go-gitignore"
 )
 
-// DefaultPatterns are the default exclude patterns applied unless --no-defaults is set.
+// DefaultPatterns are the patterns applied by --exclude-defaults.
 var DefaultPatterns = []string{
 	// VCS and dependencies
 	".git/",
@@ -33,26 +33,37 @@ var DefaultPatterns = []string{
 	"**/*.snp",
 }
 
-// Rule represents a single ordered include or exclude rule.
+// RuleType defines the kind of rule.
+type RuleType int
+
+const (
+	RuleInclude        RuleType = iota // --include <pattern>
+	RuleExclude                        // --exclude <pattern>
+	RuleIncludeAll                     // --include-all
+	RuleExcludeAll                     // --exclude-all
+	RuleExcludeDefaults                // --exclude-defaults
+)
+
+// Rule represents a single ordered filter rule.
 type Rule struct {
-	Pattern string
-	Exclude bool // true = exclude, false = include
+	Type    RuleType
+	Pattern string // only used for RuleInclude and RuleExclude
 }
 
-// rule is a compiled internal rule.
-type rule struct {
-	matcher *gitignore.GitIgnore
+// compiled is an internal evaluated rule.
+type compiled struct {
+	matcher *gitignore.GitIgnore // nil for include-all / exclude-all
 	exclude bool
 }
 
 // Matcher holds an ordered list of compiled rules. Last match wins.
 type Matcher struct {
-	rules []rule
+	rules []compiled
 }
 
-// New builds a Matcher from defaults, .gitignore, and CLI rules.
-// If noDefaults is true, defaults and .gitignore are skipped.
-func New(sourceDir string, noDefaults bool, rules []Rule) (*Matcher, error) {
+// New builds a Matcher from an ordered list of rules.
+// sourceDir is used to load .gitignore for RuleExcludeDefaults.
+func New(sourceDir string, rules []Rule) (*Matcher, error) {
 	absSourceDir, err := filepath.Abs(sourceDir)
 	if err != nil {
 		return nil, err
@@ -66,30 +77,39 @@ func New(sourceDir string, noDefaults bool, rules []Rule) (*Matcher, error) {
 		return nil, fmt.Errorf("%q is not a directory", absSourceDir)
 	}
 
-	var compiled []rule
-
-	if !noDefaults {
-		var defaultLines []string
-		defaultLines = append(defaultLines, DefaultPatterns...)
-
-		gitignorePath := filepath.Join(absSourceDir, ".gitignore")
-		if b, err := os.ReadFile(gitignorePath); err == nil {
-			lines := strings.Split(string(b), "\n")
-			defaultLines = append(defaultLines, lines...)
-		}
-
-		if len(defaultLines) > 0 {
-			m := gitignore.CompileIgnoreLines(defaultLines...)
-			compiled = append(compiled, rule{matcher: m, exclude: true})
-		}
-	}
+	var cr []compiled
 
 	for _, r := range rules {
-		m := gitignore.CompileIgnoreLines(r.Pattern)
-		compiled = append(compiled, rule{matcher: m, exclude: r.Exclude})
+		switch r.Type {
+		case RuleIncludeAll:
+			cr = append(cr, compiled{matcher: nil, exclude: false})
+
+		case RuleExcludeAll:
+			cr = append(cr, compiled{matcher: nil, exclude: true})
+
+		case RuleExcludeDefaults:
+			var lines []string
+			lines = append(lines, DefaultPatterns...)
+
+			gitignorePath := filepath.Join(absSourceDir, ".gitignore")
+			if b, err := os.ReadFile(gitignorePath); err == nil {
+				lines = append(lines, strings.Split(string(b), "\n")...)
+			}
+
+			m := gitignore.CompileIgnoreLines(lines...)
+			cr = append(cr, compiled{matcher: m, exclude: true})
+
+		case RuleInclude:
+			m := gitignore.CompileIgnoreLines(r.Pattern)
+			cr = append(cr, compiled{matcher: m, exclude: false})
+
+		case RuleExclude:
+			m := gitignore.CompileIgnoreLines(r.Pattern)
+			cr = append(cr, compiled{matcher: m, exclude: true})
+		}
 	}
 
-	return &Matcher{rules: compiled}, nil
+	return &Matcher{rules: cr}, nil
 }
 
 // ShouldInclude returns true if relPath should be included.
@@ -103,7 +123,10 @@ func (m *Matcher) ShouldInclude(relPath string) bool {
 	result := true
 
 	for _, r := range m.rules {
-		if r.matcher.MatchesPath(relPath) {
+		if r.matcher == nil {
+			// include-all or exclude-all — matches everything
+			result = !r.exclude
+		} else if r.matcher.MatchesPath(relPath) {
 			result = !r.exclude
 		}
 	}

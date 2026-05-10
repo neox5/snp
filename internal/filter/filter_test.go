@@ -8,12 +8,17 @@ import (
 	"github.com/neox5/snp/internal/filter"
 )
 
-func TestShouldInclude_Defaults(t *testing.T) {
+func TestShouldInclude_ImplicitDefaults(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	gitignoreContent := "*.log\nsecrets/\n"
-	if err := os.WriteFile(filepath.Join(tmpDir, ".gitignore"), []byte(gitignoreContent), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, ".gitignore"), []byte("*.log\nsecrets/\n"), 0o644); err != nil {
 		t.Fatalf("failed to create .gitignore: %v", err)
+	}
+
+	// Implicit default: --include-all --exclude-defaults
+	rules := []filter.Rule{
+		{Type: filter.RuleIncludeAll},
+		{Type: filter.RuleExcludeDefaults},
 	}
 
 	tests := []struct {
@@ -26,7 +31,7 @@ func TestShouldInclude_Defaults(t *testing.T) {
 			name:   "default excludes node_modules",
 			path:   "node_modules/package.json",
 			want:   false,
-			reason: "default patterns exclude node_modules/",
+			reason: "exclude-defaults covers node_modules/",
 		},
 		{
 			name:   "gitignore excludes log files",
@@ -38,7 +43,7 @@ func TestShouldInclude_Defaults(t *testing.T) {
 			name:   "normal file included",
 			path:   "src/main.go",
 			want:   true,
-			reason: "no rule matches, default is include",
+			reason: "include-all wins, not excluded by defaults",
 		},
 		{
 			name:   "gitignore directory exclusion",
@@ -50,7 +55,7 @@ func TestShouldInclude_Defaults(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := filter.New(tmpDir, false, nil)
+			m, err := filter.New(tmpDir, rules)
 			if err != nil {
 				t.Fatalf("New failed: %v", err)
 			}
@@ -73,49 +78,61 @@ func TestShouldInclude_OrderedRules(t *testing.T) {
 		reason string
 	}{
 		{
-			name: "last rule wins — include after exclude",
+			name: "exclude-all then include Go — only Go files",
 			rules: []filter.Rule{
-				{Pattern: "**/*.go", Exclude: false},
-				{Pattern: "**/*_test.go", Exclude: true},
-				{Pattern: "internal/auth/auth_test.go", Exclude: false},
+				{Type: filter.RuleExcludeAll},
+				{Type: filter.RuleInclude, Pattern: "**/*.go"},
+			},
+			path:   "src/main.go",
+			want:   true,
+			reason: "include **/*.go wins after exclude-all",
+		},
+		{
+			name: "exclude-all then include Go — non-Go excluded",
+			rules: []filter.Rule{
+				{Type: filter.RuleExcludeAll},
+				{Type: filter.RuleInclude, Pattern: "**/*.go"},
+			},
+			path:   "README.md",
+			want:   false,
+			reason: "exclude-all wins, no include rule matches",
+		},
+		{
+			name: "last rule wins — rescue from exclude",
+			rules: []filter.Rule{
+				{Type: filter.RuleIncludeAll},
+				{Type: filter.RuleExcludeDefaults},
+				{Type: filter.RuleExclude, Pattern: "**/*_test.go"},
+				{Type: filter.RuleInclude, Pattern: "internal/auth/auth_test.go"},
 			},
 			path:   "internal/auth/auth_test.go",
 			want:   true,
-			reason: "last matching rule is include",
+			reason: "last include rule rescues specific test file",
 		},
 		{
 			name: "last rule wins — exclude after include",
 			rules: []filter.Rule{
-				{Pattern: "**/*.go", Exclude: false},
-				{Pattern: "**/*_test.go", Exclude: true},
+				{Type: filter.RuleIncludeAll},
+				{Type: filter.RuleExclude, Pattern: "**/*_test.go"},
 			},
 			path:   "internal/auth/auth_test.go",
 			want:   false,
-			reason: "last matching rule is exclude",
+			reason: "exclude wins as last matching rule",
 		},
 		{
-			name: "no match defaults to include",
+			name: "include-all baseline — everything included",
 			rules: []filter.Rule{
-				{Pattern: "**/*.go", Exclude: false},
+				{Type: filter.RuleIncludeAll},
 			},
-			path:   "README.md",
+			path:   "node_modules/package.json",
 			want:   true,
-			reason: "no rule matches, default is include",
-		},
-		{
-			name: "single exclude rule",
-			rules: []filter.Rule{
-				{Pattern: "**/*.log", Exclude: true},
-			},
-			path:   "app.log",
-			want:   false,
-			reason: "matched by exclude rule",
+			reason: "include-all with no further rules includes everything",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := filter.New(tmpDir, true, tt.rules)
+			m, err := filter.New(tmpDir, tt.rules)
 			if err != nil {
 				t.Fatalf("New failed: %v", err)
 			}
@@ -127,35 +144,6 @@ func TestShouldInclude_OrderedRules(t *testing.T) {
 	}
 }
 
-func TestShouldInclude_NoDefaults(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	if err := os.WriteFile(filepath.Join(tmpDir, ".gitignore"), []byte("*.log"), 0o644); err != nil {
-		t.Fatalf("failed to create .gitignore: %v", err)
-	}
-
-	m, err := filter.New(tmpDir, true, nil)
-	if err != nil {
-		t.Fatalf("New failed: %v", err)
-	}
-
-	tests := []struct {
-		path string
-		want bool
-	}{
-		{"node_modules/package.json", true},
-		{"app.log", true},
-		{"src/main.go", true},
-	}
-
-	for _, tt := range tests {
-		got := m.ShouldInclude(tt.path)
-		if got != tt.want {
-			t.Errorf("ShouldInclude(%q) = %v, want %v", tt.path, got, tt.want)
-		}
-	}
-}
-
 func TestShouldInclude_NilMatcher(t *testing.T) {
 	var m *filter.Matcher
 	if !m.ShouldInclude("any/path.go") {
@@ -164,7 +152,7 @@ func TestShouldInclude_NilMatcher(t *testing.T) {
 }
 
 func TestNew_InvalidDirectory(t *testing.T) {
-	_, err := filter.New("/nonexistent/directory/12345", false, nil)
+	_, err := filter.New("/nonexistent/directory/12345", nil)
 	if err == nil {
 		t.Error("New should fail for nonexistent directory")
 	}
