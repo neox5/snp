@@ -169,7 +169,7 @@ Two modes (mutually exclusive):
 			}
 			defer outFile.Close()
 
-			if err := snap.WriteTo(outFile); err != nil {
+			if _, err := snap.WriteTo(outFile); err != nil {
 				return err
 			}
 

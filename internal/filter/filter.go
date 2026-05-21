@@ -3,12 +3,11 @@
 package filter
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	gitignore "github.com/sabhiram/go-gitignore"
 )
 
 // DefaultPatterns are the patterns applied by --exclude-defaults.
@@ -37,11 +36,11 @@ var DefaultPatterns = []string{
 type RuleType int
 
 const (
-	RuleInclude        RuleType = iota // --include <pattern>
-	RuleExclude                        // --exclude <pattern>
-	RuleIncludeAll                     // --include-all
-	RuleExcludeAll                     // --exclude-all
-	RuleExcludeDefaults                // --exclude-defaults
+	RuleInclude         RuleType = iota // --include <pattern>
+	RuleExclude                         // --exclude <pattern>
+	RuleIncludeAll                      // --include-all
+	RuleExcludeAll                      // --exclude-all
+	RuleExcludeDefaults                 // --exclude-defaults
 )
 
 // Rule represents a single ordered filter rule.
@@ -52,8 +51,8 @@ type Rule struct {
 
 // compiled is an internal evaluated rule.
 type compiled struct {
-	matcher *gitignore.GitIgnore // nil for include-all / exclude-all
-	exclude bool
+	patterns []string // empty means match-all (include-all / exclude-all)
+	exclude  bool
 }
 
 // Matcher holds an ordered list of compiled rules. Last match wins.
@@ -82,30 +81,21 @@ func New(sourceDir string, rules []Rule) (*Matcher, error) {
 	for _, r := range rules {
 		switch r.Type {
 		case RuleIncludeAll:
-			cr = append(cr, compiled{matcher: nil, exclude: false})
+			cr = append(cr, compiled{patterns: nil, exclude: false})
 
 		case RuleExcludeAll:
-			cr = append(cr, compiled{matcher: nil, exclude: true})
+			cr = append(cr, compiled{patterns: nil, exclude: true})
 
 		case RuleExcludeDefaults:
-			var lines []string
-			lines = append(lines, DefaultPatterns...)
-
-			gitignorePath := filepath.Join(absSourceDir, ".gitignore")
-			if b, err := os.ReadFile(gitignorePath); err == nil {
-				lines = append(lines, strings.Split(string(b), "\n")...)
-			}
-
-			m := gitignore.CompileIgnoreLines(lines...)
-			cr = append(cr, compiled{matcher: m, exclude: true})
+			patterns := append([]string{}, DefaultPatterns...)
+			patterns = append(patterns, loadGitignore(filepath.Join(absSourceDir, ".gitignore"))...)
+			cr = append(cr, compiled{patterns: patterns, exclude: true})
 
 		case RuleInclude:
-			m := gitignore.CompileIgnoreLines(r.Pattern)
-			cr = append(cr, compiled{matcher: m, exclude: false})
+			cr = append(cr, compiled{patterns: []string{r.Pattern}, exclude: false})
 
 		case RuleExclude:
-			m := gitignore.CompileIgnoreLines(r.Pattern)
-			cr = append(cr, compiled{matcher: m, exclude: true})
+			cr = append(cr, compiled{patterns: []string{r.Pattern}, exclude: true})
 		}
 	}
 
@@ -123,13 +113,41 @@ func (m *Matcher) ShouldInclude(relPath string) bool {
 	result := true
 
 	for _, r := range m.rules {
-		if r.matcher == nil {
+		if len(r.patterns) == 0 {
 			// include-all or exclude-all — matches everything
 			result = !r.exclude
-		} else if r.matcher.MatchesPath(relPath) {
+			continue
+		}
+
+		for _, pattern := range r.patterns {
+			matched, err := Match(pattern, relPath)
+			if err != nil || !matched {
+				continue
+			}
 			result = !r.exclude
+			break
 		}
 	}
 
 	return result
+}
+
+// loadGitignore reads a .gitignore file and returns non-empty, non-comment lines.
+func loadGitignore(path string) []string {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimRight(scanner.Text(), "\r")
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }

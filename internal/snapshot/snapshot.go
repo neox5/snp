@@ -125,18 +125,18 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 }
 
 // WriteTo writes the snapshot to the output
-func (s *Snapshot) WriteTo(w io.Writer) error {
+func (s *Snapshot) WriteTo(w io.Writer) (int64, error) {
 	if s.Layout == nil {
-		return fmt.Errorf("layout not initialized")
+		return 0, fmt.Errorf("layout not initialized")
 	}
 
 	lt := writer.NewLineTracker(w)
 
 	for _, content := range s.Layout {
 		if err := content.WriteTo(lt); err != nil {
-			return err
+			return 0, err
 		}
 	}
 
-	return lt.Flush()
+	return 0, lt.Flush()
 }

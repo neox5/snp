@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	gitignore "github.com/sabhiram/go-gitignore"
+	"github.com/neox5/snp/internal/filter"
 )
 
 // DetectBinary checks if a file is binary
@@ -59,24 +59,24 @@ func DetectBinary(path string, size int64) (bool, error) {
 	return false, nil
 }
 
-// CheckForceOverride checks force-text and force-binary patterns
-// Returns (isBinary, overridden)
-// Precedence: force-binary always wins (safe side)
+// CheckForceOverride checks force-text and force-binary patterns.
+// Returns (isBinary, overridden).
+// Precedence: force-binary always wins (safe side).
 func CheckForceOverride(relPath string, forceTextPatterns, forceBinaryPatterns []string) (isBinary bool, overridden bool) {
 	relUnix := filepath.ToSlash(relPath)
 
 	// Check force-binary first (highest precedence)
-	if len(forceBinaryPatterns) > 0 {
-		matcher := gitignore.CompileIgnoreLines(forceBinaryPatterns...)
-		if matcher.MatchesPath(relUnix) {
+	for _, pattern := range forceBinaryPatterns {
+		matched, err := filter.Match(pattern, relUnix)
+		if err == nil && matched {
 			return true, true
 		}
 	}
 
 	// Check force-text (lower precedence)
-	if len(forceTextPatterns) > 0 {
-		matcher := gitignore.CompileIgnoreLines(forceTextPatterns...)
-		if matcher.MatchesPath(relUnix) {
+	for _, pattern := range forceTextPatterns {
+		matched, err := filter.Match(pattern, relUnix)
+		if err == nil && matched {
 			return false, true
 		}
 	}
