@@ -189,8 +189,9 @@ Two modes (mutually exclusive):
 }
 
 // buildFilterRules reconstructs ordered filter rules from raw CLI args.
-// If no baseline flag is present, injects implicit defaults:
+// If no baseline flag is present, seeds with implicit defaults:
 // --include-all --exclude-defaults
+// User --include/--exclude rules are always appended in order.
 func buildFilterRules(args []string, includes, excludes []string) []filter.Rule {
 	includeSet := make(map[string]bool)
 	excludeSet := make(map[string]bool)
@@ -215,16 +216,17 @@ func buildFilterRules(args []string, includes, excludes []string) []filter.Rule 
 		}
 	}
 
-	// Inject implicit defaults if no baseline present
+	// Seed with implicit defaults if no baseline present
+	var rules []filter.Rule
 	if !hasBaseline {
-		return []filter.Rule{
+		rules = []filter.Rule{
 			{Type: filter.RuleIncludeAll},
 			{Type: filter.RuleExcludeDefaults},
 		}
 	}
 
-	// Parse args in order
-	var rules []filter.Rule
+	// Parse args in order — baseline flags append to rules,
+	// --include/--exclude always append
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
