@@ -39,6 +39,7 @@ func buildParamsFromCLI(c *cli.Command) config.Params {
 		NoGitLog:            c.Bool("no-git-log"),
 		NoContent:           c.Bool("no-content"),
 		Silent:              c.Bool("silent"),
+		VerboseLevel:        verboseCount,
 	}
 }
 

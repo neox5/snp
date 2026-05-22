@@ -11,12 +11,13 @@ import (
 // It is the input to FromParams and FromParamsCLI and is never persisted directly.
 type Params struct {
 	// runtime-only
-	SourceDir   string
-	Args        []string
-	NoConfig    bool
-	SaveConfig  bool
-	PrintConfig bool
-	DryRun      bool
+	SourceDir    string
+	Args         []string
+	NoConfig     bool
+	SaveConfig   bool
+	PrintConfig  bool
+	DryRun       bool
+	VerboseLevel int
 	// persistable
 	Depth               int
 	Includes            []string

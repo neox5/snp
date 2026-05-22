@@ -10,11 +10,22 @@ import (
 	"github.com/neox5/snp/internal/version"
 )
 
+var verboseCount int
+
+func init() {
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   "print the version",
+	}
+}
+
 func main() {
 	app := &cli.Command{
-		Name:    "snp",
-		Usage:   "Concatenate readable source/text files into one snapshot file.",
-		Version: version.String(),
+		Name:                   "snp",
+		Usage:                  "Concatenate readable source/text files into one snapshot file.",
+		Version:                version.String(),
+		UseShortOptionHandling: true,
 		UsageText: `snp [OPTIONS] [DIRECTORY]
 
 Concatenates readable source/text files into one snapshot file.
@@ -26,6 +37,20 @@ Examples:
   snp --dry-run              # list files without writing
   snp --pick go.mod go.sum   # include only specific files`,
 		Flags: []cli.Flag{
+			// Verbosity
+			&cli.BoolFlag{
+				Name:    "verbose",
+				Aliases: []string{"v"},
+				Usage:   "verbose output (-v) or debug output (-vv)",
+				Config:  cli.BoolConfig{Count: &verboseCount},
+			},
+			// Depth
+			&cli.IntFlag{
+				Name:        "depth",
+				Usage:       "Limit traversal depth (0 = root only, -1 = unlimited)",
+				DefaultText: "unlimited",
+				Value:       -1,
+			},
 			// File selection — traversal
 			&cli.BoolFlag{
 				Name:  "include-all",
@@ -51,13 +76,6 @@ Examples:
 			&cli.StringSliceFlag{
 				Name:  "pick",
 				Usage: "Include only these exact paths (repeatable, mutually exclusive with traversal flags)",
-			},
-			// Depth
-			&cli.IntFlag{
-				Name:        "depth",
-				Usage:       "Limit traversal depth (0 = root only, -1 = unlimited)",
-				DefaultText: "unlimited",
-				Value:       -1,
 			},
 			// Output sections
 			&cli.BoolFlag{
