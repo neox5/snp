@@ -19,15 +19,14 @@ func Load(dir string) (Config, error) {
 
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {
-		return Config{}, nil
+		return newConfig(), nil
 	}
 	if err != nil {
-		return Config{}, fmt.Errorf("opening %s: %w", ConfigFileName, err)
+		return newConfig(), fmt.Errorf("opening %s: %w", ConfigFileName, err)
 	}
 	defer f.Close()
 
-	var cfg Config
-	cfg.Depth = -1
+	cfg := newConfig()
 	scanner := bufio.NewScanner(f)
 	lineNum := 0
 
@@ -38,12 +37,12 @@ func Load(dir string) (Config, error) {
 			continue
 		}
 		if err := parseLine(line, lineNum, &cfg); err != nil {
-			return Config{}, err
+			return newConfig(), err
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return Config{}, fmt.Errorf("reading %s: %w", ConfigFileName, err)
+		return newConfig(), fmt.Errorf("reading %s: %w", ConfigFileName, err)
 	}
 
 	return cfg, nil

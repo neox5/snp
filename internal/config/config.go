@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/neox5/snp/internal/filter"
 	"time"
+
+	"github.com/neox5/snp/internal/filter"
 )
 
 const (
@@ -31,6 +32,14 @@ type Config struct {
 	NoContent  bool
 	DryRun     bool
 	Silent     bool
+}
+
+// newConfig returns a Config with all sentinel values properly initialized.
+// Use this instead of Config{} wherever a blank config is needed.
+func newConfig() Config {
+	return Config{
+		Depth: -1,
+	}
 }
 
 // IsPick reports whether the config is in pick mode.

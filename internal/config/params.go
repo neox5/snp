@@ -46,19 +46,18 @@ func FromParamsCLI(p Params) Config {
 // fromParams is the shared internal builder.
 // If load is true, it loads and merges the .snpconfig file from p.SourceDir.
 func fromParams(p Params, load bool) (Config, error) {
-	var loaded Config
+	loaded := newConfig()
 	if load {
 		var err error
 		loaded, err = Load(p.SourceDir)
 		if err != nil {
-			return Config{}, fmt.Errorf("loading config: %w", err)
+			return newConfig(), fmt.Errorf("loading config: %w", err)
 		}
 	}
 
-	cfg := Config{
-		SourceDir: p.SourceDir,
-		DryRun:    p.DryRun,
-	}
+	cfg := newConfig()
+	cfg.SourceDir = p.SourceDir
+	cfg.DryRun = p.DryRun
 
 	// depth: CLI wins if explicitly set (not -1), else use loaded, else -1
 	if p.Depth != -1 {
