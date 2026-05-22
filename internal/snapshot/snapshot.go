@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/neox5/snp/internal/config"
@@ -23,6 +25,33 @@ type Snapshot struct {
 
 // GitLogLines represents git log output.
 type GitLogLines []string
+
+// ValidateAndResolve validates the config and resolves absolute paths.
+func ValidateAndResolve(cfg config.Config) (absSourceDir, absOutput string, err error) {
+	srcInfo, err := os.Stat(cfg.SourceDir)
+	if err != nil {
+		return "", "", fmt.Errorf("cannot stat directory %q: %w", cfg.SourceDir, err)
+	}
+	if !srcInfo.IsDir() {
+		return "", "", fmt.Errorf("path %q is not a directory", cfg.SourceDir)
+	}
+
+	absSourceDir, err = filepath.Abs(cfg.SourceDir)
+	if err != nil {
+		return "", "", fmt.Errorf("cannot resolve source directory: %w", err)
+	}
+
+	outputPath := cfg.OutputPath
+	if outputPath == "" {
+		outputPath = config.DefaultOutputPath
+	}
+	absOutput, err = filepath.Abs(outputPath)
+	if err != nil {
+		return "", "", fmt.Errorf("cannot resolve output path %q: %w", outputPath, err)
+	}
+
+	return absSourceDir, absOutput, nil
+}
 
 // Build creates a complete snapshot.
 func Build(ctx context.Context, cfg config.Config, absSourceDir string, absOutput string) (*Snapshot, error) {
@@ -68,7 +97,6 @@ func Build(ctx context.Context, cfg config.Config, absSourceDir string, absOutpu
 	snap.Files = files
 	snap.CollapsedDirs = collapsedDirs
 
-	// calculate total size
 	var totalSize int64
 	for _, f := range files {
 		totalSize += f.Size
@@ -121,7 +149,6 @@ func Build(ctx context.Context, cfg config.Config, absSourceDir string, absOutpu
 		}
 	}
 
-	// assign start lines
 	currentLine := 1
 	for _, content := range layout {
 		if fc, ok := content.(fileContent); ok {

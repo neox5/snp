@@ -95,21 +95,6 @@ func newDivider() Content {
 	return divider{}
 }
 
-// emptyLine represents a blank line
-type emptyLine struct{}
-
-func (e emptyLine) LineCount() int {
-	return 1
-}
-
-func (e emptyLine) WriteTo(lt *writer.LineTracker) error {
-	return lt.WriteLine("")
-}
-
-func newEmptyLine() Content {
-	return emptyLine{}
-}
-
 // ===== Content Types =====
 
 // gitLog represents git log lines
