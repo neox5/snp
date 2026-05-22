@@ -9,7 +9,7 @@ import (
 )
 
 // ValidateAndResolve validates the config and resolves paths.
-func ValidateAndResolve(cfg config.FullConfig) (absSourceDir, absOutput string, err error) {
+func ValidateAndResolve(cfg config.Config) (absSourceDir, absOutput string, err error) {
 	srcInfo, err := os.Stat(cfg.SourceDir)
 	if err != nil {
 		return "", "", fmt.Errorf("cannot stat directory %q: %w", cfg.SourceDir, err)

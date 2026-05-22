@@ -10,9 +10,6 @@ import (
 	"github.com/neox5/snp/internal/version"
 )
 
-// baselineFlags are the flags that set the starting state for traversal.
-var baselineFlags = []string{"--include-all", "--exclude-all", "--exclude-defaults"}
-
 func main() {
 	app := &cli.Command{
 		Name:    "snp",
@@ -23,34 +20,25 @@ func main() {
 Concatenates readable source/text files into one snapshot file.
 If DIRECTORY is omitted, '.' is used.
 
-Two modes (mutually exclusive):
-  Traversal (default): walk directory tree with ordered filter rules
-  Pick:                directly address files by path or glob, no traversal`,
+Examples:
+  snp                        # snapshot current directory
+  snp ./myproject            # snapshot specific directory
+  snp --dry-run              # list files without writing
+  snp --pick go.mod go.sum   # include only specific files`,
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "output",
-				Usage: "Set output file path (default: snapshot.snp)",
-			},
-			// Depth
-			&cli.IntFlag{
-				Name:  "depth",
-				Usage: "Limit traversal depth (0 = root files only, -1 = full traversal)",
-				Value: -1,
-			},
-			// Mode 1 — Traversal baseline
+			// File selection — traversal
 			&cli.BoolFlag{
 				Name:  "include-all",
-				Usage: "Baseline: include all files (positional, ordered)",
+				Usage: "Baseline: include all files",
 			},
 			&cli.BoolFlag{
 				Name:  "exclude-all",
-				Usage: "Baseline: exclude all files (positional, ordered)",
+				Usage: "Baseline: exclude all files",
 			},
 			&cli.BoolFlag{
 				Name:  "exclude-defaults",
-				Usage: "Baseline: exclude default patterns and .gitignore (positional, ordered)",
+				Usage: "Baseline: exclude default patterns and .gitignore",
 			},
-			// Mode 1 — Traversal filters
 			&cli.StringSliceFlag{
 				Name:  "include",
 				Usage: "Include files matching glob pattern (repeatable, ordered)",
@@ -59,42 +47,56 @@ Two modes (mutually exclusive):
 				Name:  "exclude",
 				Usage: "Exclude files matching glob pattern (repeatable, ordered)",
 			},
-			// Mode 1 — Utility
-			&cli.BoolFlag{
-				Name:  "show-defaults",
-				Usage: "Print default exclude patterns and exit",
-			},
-			// Mode 2 — Pick
+			// File selection — pick
 			&cli.StringSliceFlag{
 				Name:  "pick",
-				Usage: "Directly include file by path or glob, no traversal (repeatable)",
+				Usage: "Include only these exact paths (repeatable, mutually exclusive with traversal flags)",
+			},
+			// Depth
+			&cli.IntFlag{
+				Name:        "depth",
+				Usage:       "Limit traversal depth (0 = root only, -1 = unlimited)",
+				DefaultText: "unlimited",
+				Value:       -1,
 			},
 			// Output sections
 			&cli.BoolFlag{
 				Name:  "no-summary",
-				Usage: "Omit the summary header",
+				Usage: "Omit summary section",
 			},
 			&cli.BoolFlag{
 				Name:  "no-index",
-				Usage: "Omit the file index",
+				Usage: "Omit file index section",
 			},
 			&cli.BoolFlag{
 				Name:  "no-git-log",
-				Usage: "Omit the Git log section",
+				Usage: "Omit git log section",
 			},
 			&cli.BoolFlag{
 				Name:  "no-content",
-				Usage: "Omit file contents (index and metadata only)",
+				Usage: "Omit file content sections",
 			},
-			// Shared
+			// Output control
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"o"},
+				Usage:   "Output file path",
+			},
 			&cli.BoolFlag{
-				Name:  "dry-run",
-				Usage: "Print files that would be included without creating output",
+				Name:    "dry-run",
+				Aliases: []string{"n"},
+				Usage:   "List files that would be included without writing output",
 			},
 			&cli.BoolFlag{
 				Name:  "silent",
-				Usage: "Suppress all output (exit codes only)",
+				Usage: "Suppress all output messages",
 			},
+			// Diagnostics
+			&cli.BoolFlag{
+				Name:  "show-defaults",
+				Usage: "Print default exclude patterns and exit",
+			},
+			// Binary overrides
 			&cli.StringSliceFlag{
 				Name:  "force-text",
 				Usage: "Force files matching glob pattern to be treated as text (repeatable)",

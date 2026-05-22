@@ -14,6 +14,34 @@ import (
 	"github.com/neox5/snp/internal/snapshot"
 )
 
+func buildParamsFromCLI(c *cli.Command) config.Params {
+	sourceDir := "."
+	if c.NArg() > 0 {
+		sourceDir = c.Args().First()
+	}
+
+	return config.Params{
+		SourceDir:           sourceDir,
+		Args:                os.Args[1:],
+		NoConfig:            c.Bool("no-config"),
+		SaveConfig:          c.Bool("save-config"),
+		PrintConfig:         c.Bool("print-config"),
+		DryRun:              c.Bool("dry-run"),
+		Depth:               c.Int("depth"),
+		Includes:            c.StringSlice("include"),
+		Excludes:            c.StringSlice("exclude"),
+		PickPaths:           c.StringSlice("pick"),
+		ForceTextPatterns:   c.StringSlice("force-text"),
+		ForceBinaryPatterns: c.StringSlice("force-binary"),
+		OutputPath:          c.String("output"),
+		NoSummary:           c.Bool("no-summary"),
+		NoIndex:             c.Bool("no-index"),
+		NoGitLog:            c.Bool("no-git-log"),
+		NoContent:           c.Bool("no-content"),
+		Silent:              c.Bool("silent"),
+	}
+}
+
 func runAction(ctx context.Context, c *cli.Command) error {
 	if c.Bool("show-defaults") {
 		fmt.Println("Default exclude patterns:")
@@ -24,92 +52,44 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return nil
 	}
 
-	sourceDir := "."
-	if c.NArg() > 0 {
-		sourceDir = c.Args().First()
-	}
+	p := buildParamsFromCLI(c)
 
-	pickPaths := c.StringSlice("pick")
-	includes := c.StringSlice("include")
-	excludes := c.StringSlice("exclude")
-	forceText := c.StringSlice("force-text")
-	forceBinary := c.StringSlice("force-binary")
-	outputPath := c.String("output")
-	noSummary := c.Bool("no-summary")
-	noIndex := c.Bool("no-index")
-	noGitLog := c.Bool("no-git-log")
-	noContent := c.Bool("no-content")
-	silent := c.Bool("silent")
-	dryRun := c.Bool("dry-run")
-	depth := c.Int("depth")
-
-	hasPick := len(pickPaths) > 0
-	hasTraversal := len(includes) > 0 || len(excludes) > 0 ||
+	hasPick := len(p.PickPaths) > 0
+	hasTraversal := len(p.Includes) > 0 || len(p.Excludes) > 0 ||
 		c.Bool("include-all") || c.Bool("exclude-all") || c.Bool("exclude-defaults")
 
 	if hasPick && hasTraversal {
 		return fmt.Errorf("--pick cannot be combined with --include, --exclude, --include-all, --exclude-all, or --exclude-defaults")
 	}
-	if hasPick && depth != -1 {
+	if hasPick && p.Depth != -1 {
 		return fmt.Errorf("--depth cannot be combined with --pick")
 	}
 
-	// --save-config
-	if c.Bool("save-config") {
-		saveCfg := buildSaveConfig(
-			os.Args[1:],
-			includes, excludes, pickPaths,
-			forceText, forceBinary,
-			outputPath,
-			noSummary, noIndex, noGitLog, noContent, silent,
-			depth,
-		)
-		saveCfg.Generated = time.Now()
-		if err := config.Save(sourceDir, saveCfg); err != nil {
+	if p.SaveConfig {
+		cfg := config.FromParamsCLI(p)
+		cfg.Generated = time.Now()
+		if err := cfg.Save(p.SourceDir); err != nil {
 			return err
 		}
-		if !silent {
+		if !p.Silent {
 			fmt.Printf("Saved config to %s\n", config.ConfigFileName)
 		}
 		return nil
 	}
 
-	// --print-config
-	if c.Bool("print-config") {
-		var loaded config.FullConfig
-		if !c.Bool("no-config") {
-			var err error
-			loaded, err = config.Load(sourceDir)
-			if err != nil {
-				return err
-			}
-		}
-		config.Print(loaded)
-		return nil
-	}
-
-	// load .snpconfig unless --no-config
-	var loaded config.FullConfig
-	if !c.Bool("no-config") {
-		var err error
-		loaded, err = config.Load(sourceDir)
+	if p.PrintConfig {
+		cfg, err := config.Load(p.SourceDir)
 		if err != nil {
 			return err
 		}
+		cfg.Print()
+		return nil
 	}
 
-	cfg := buildFullConfig(
-		os.Args[1:],
-		loaded,
-		includes, excludes, pickPaths,
-		forceText, forceBinary,
-		outputPath,
-		noSummary, noIndex, noGitLog, noContent, silent, dryRun,
-		depth,
-		sourceDir,
-	)
-
-	config.ApplyDefaults(&cfg)
+	cfg, err := config.FromParams(p)
+	if err != nil {
+		return err
+	}
 
 	absSourceDir, absOutput, err := snapshot.ValidateAndResolve(cfg)
 	if err != nil {
@@ -149,10 +129,8 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return err
 	}
 
-	elapsed := time.Since(start)
-
 	if !cfg.Silent {
-		fmt.Printf("Snapshot created: %s (%s)\n", absOutput, formatDuration(elapsed))
+		fmt.Printf("Snapshot created: %s (%s)\n", absOutput, formatDuration(time.Since(start)))
 	}
 
 	return nil

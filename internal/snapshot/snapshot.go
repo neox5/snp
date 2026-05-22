@@ -25,7 +25,7 @@ type Snapshot struct {
 type GitLogLines []string
 
 // Build creates a complete snapshot.
-func Build(ctx context.Context, cfg config.FullConfig, absSourceDir string, absOutput string) (*Snapshot, error) {
+func Build(ctx context.Context, cfg config.Config, absSourceDir string, absOutput string) (*Snapshot, error) {
 	snap := &Snapshot{}
 
 	var files []*file.File
