@@ -86,6 +86,15 @@ Two modes (mutually exclusive):
 				Name:  "force-binary",
 				Usage: "Force files matching glob pattern to be treated as binary (repeatable)",
 			},
+			// Config
+			&cli.BoolFlag{
+				Name:  "no-config",
+				Usage: "Skip .snpconfig file even if present",
+			},
+			&cli.BoolFlag{
+				Name:  "save-config",
+				Usage: "Save current traversal flags to .snpconfig in source directory and exit",
+			},
 		},
 		ArgsUsage: "[DIRECTORY]",
 		Action:    runAction,

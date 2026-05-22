@@ -8,6 +8,7 @@ import (
 
 	cli "github.com/urfave/cli/v3"
 
+	"github.com/neox5/snp/internal/config"
 	"github.com/neox5/snp/internal/filter"
 	"github.com/neox5/snp/internal/snapshot"
 )
@@ -40,14 +41,42 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return fmt.Errorf("--pick cannot be combined with --include, --exclude, --include-all, --exclude-all, or --exclude-defaults")
 	}
 
+	// --save-config not allowed in pick mode
+	if c.Bool("save-config") && hasPick {
+		return fmt.Errorf("--save-config cannot be combined with --pick")
+	}
+
 	mode := snapshot.ModeTraversal
 	if hasPick {
 		mode = snapshot.ModePick
 	}
 
 	var filterRules []filter.Rule
+
 	if mode == snapshot.ModeTraversal {
-		filterRules = buildFilterRules(os.Args[1:], includes, excludes)
+		// load .snpconfig unless --no-config
+		var configRules []filter.Rule
+		if !c.Bool("no-config") {
+			var err error
+			configRules, err = config.Load(sourceDir)
+			if err != nil {
+				return err
+			}
+		}
+
+		// --save-config: write current CLI traversal flags and exit
+		if c.Bool("save-config") {
+			cliRules := buildCLIRules(os.Args[1:], includes, excludes)
+			if err := config.Save(sourceDir, cliRules); err != nil {
+				return err
+			}
+			if !silent {
+				fmt.Printf("Saved config to %s\n", config.ConfigFileName)
+			}
+			return nil
+		}
+
+		filterRules = buildFilterRules(os.Args[1:], includes, excludes, configRules)
 	}
 
 	cfg := snapshot.Config{

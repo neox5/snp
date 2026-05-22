@@ -3,14 +3,44 @@ package main
 import (
 	"strings"
 
+	"github.com/neox5/snp/internal/config"
 	"github.com/neox5/snp/internal/filter"
 )
 
-// buildFilterRules reconstructs ordered filter rules from raw CLI args.
-// If no baseline flag is present, seeds with implicit defaults:
-// --include-all --exclude-defaults
-// User --include/--exclude rules are always appended in order.
-func buildFilterRules(args []string, includes, excludes []string) []filter.Rule {
+// buildFilterRules reconstructs ordered filter rules from raw CLI args,
+// injecting configRules between the implicit baseline and CLI flags.
+//
+// Order:
+//
+//	[implicit baseline]   — suppressed if baseline present in args OR configRules
+//	[configRules]
+//	[CLI args in order]
+func buildFilterRules(args []string, includes, excludes []string, configRules []filter.Rule) []filter.Rule {
+	hasBaselineCLI := hasBaselineFlag(args)
+	hasBaselineConfig := config.HasBaseline(configRules)
+
+	var rules []filter.Rule
+
+	// seed implicit baseline only if no baseline anywhere
+	if !hasBaselineCLI && !hasBaselineConfig {
+		rules = []filter.Rule{
+			{Type: filter.RuleIncludeAll},
+			{Type: filter.RuleExcludeDefaults},
+		}
+	}
+
+	// inject config rules
+	rules = append(rules, configRules...)
+
+	// append CLI rules in order
+	rules = append(rules, buildCLIRules(args, includes, excludes)...)
+
+	return rules
+}
+
+// buildCLIRules extracts only the traversal rules from raw CLI args in order.
+// Used both by buildFilterRules and --save-config.
+func buildCLIRules(args []string, includes, excludes []string) []filter.Rule {
 	includeSet := make(map[string]int)
 	excludeSet := make(map[string]int)
 	for _, v := range includes {
@@ -20,31 +50,8 @@ func buildFilterRules(args []string, includes, excludes []string) []filter.Rule 
 		excludeSet[v]++
 	}
 
-	// Check if any baseline flag is present
-	hasBaseline := false
-	for _, arg := range args {
-		for _, bf := range baselineFlags {
-			if arg == bf {
-				hasBaseline = true
-				break
-			}
-		}
-		if hasBaseline {
-			break
-		}
-	}
-
-	// Seed with implicit defaults if no baseline present
 	var rules []filter.Rule
-	if !hasBaseline {
-		rules = []filter.Rule{
-			{Type: filter.RuleIncludeAll},
-			{Type: filter.RuleExcludeDefaults},
-		}
-	}
 
-	// Parse args in order — baseline flags append to rules,
-	// --include/--exclude consume from their respective count maps
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
@@ -95,4 +102,16 @@ func buildFilterRules(args []string, includes, excludes []string) []filter.Rule 
 	}
 
 	return rules
+}
+
+// hasBaselineFlag reports whether any baseline flag is present in args.
+func hasBaselineFlag(args []string) bool {
+	for _, arg := range args {
+		for _, bf := range baselineFlags {
+			if arg == bf {
+				return true
+			}
+		}
+	}
+	return false
 }
