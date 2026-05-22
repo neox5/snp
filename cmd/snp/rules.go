@@ -2,45 +2,111 @@ package main
 
 import (
 	"strings"
+	"time"
 
 	"github.com/neox5/snp/internal/config"
 	"github.com/neox5/snp/internal/filter"
 )
 
-// buildFilterRules reconstructs ordered filter rules from raw CLI args,
-// injecting configRules between the implicit baseline and CLI flags.
+// buildFullConfig constructs a config.FullConfig from CLI args and loaded config.
 //
-// Order:
+// Merge order for filter rules:
 //
-//	[implicit baseline]   — suppressed if baseline present in args OR configRules
-//	[configRules]
-//	[CLI args in order]
-func buildFilterRules(args []string, includes, excludes []string, configRules []filter.Rule) []filter.Rule {
-	hasBaselineCLI := hasBaselineFlag(args)
-	hasBaselineConfig := config.HasBaseline(configRules)
-
-	var rules []filter.Rule
-
-	// seed implicit baseline only if no baseline anywhere
-	if !hasBaselineCLI && !hasBaselineConfig {
-		rules = []filter.Rule{
-			{Type: filter.RuleIncludeAll},
-			{Type: filter.RuleExcludeDefaults},
-		}
+//	[implicit baseline]   — suppressed if baseline present in args OR loaded config
+//	[config rules]        — from .snpconfig
+//	[CLI rules in order]  — from current invocation
+//
+// All other fields: CLI flags override loaded config values.
+func buildFullConfig(
+	args []string,
+	loaded config.FullConfig,
+	includes, excludes, pickPaths []string,
+	forceText, forceBinary []string,
+	outputPath string,
+	noSummary, noIndex, noGitLog, noContent, silent, dryRun bool,
+	sourceDir string,
+) config.FullConfig {
+	cfg := config.FullConfig{
+		SourceDir: sourceDir,
+		DryRun:    dryRun,
 	}
 
-	// inject config rules
-	rules = append(rules, configRules...)
+	// pick mode — CLI picks override config picks entirely
+	if len(pickPaths) > 0 {
+		cfg.PickPaths = pickPaths
+	} else if len(loaded.PickPaths) > 0 {
+		cfg.PickPaths = loaded.PickPaths
+	}
 
-	// append CLI rules in order
-	rules = append(rules, buildCLIRules(args, includes, excludes)...)
+	// filter rules (traversal mode)
+	if len(cfg.PickPaths) == 0 {
+		hasBaselineCLI := hasBaselineFlag(args)
+		hasBaselineConfig := config.HasBaseline(loaded)
 
-	return rules
+		var rules []filter.Rule
+
+		if !hasBaselineCLI && !hasBaselineConfig {
+			rules = append(rules,
+				filter.Rule{Type: filter.RuleIncludeAll},
+				filter.Rule{Type: filter.RuleExcludeDefaults},
+			)
+		}
+
+		rules = append(rules, loaded.FilterRules...)
+		rules = append(rules, buildCLIFilterRules(args, includes, excludes)...)
+		cfg.FilterRules = rules
+	}
+
+	// force overrides: merge config + CLI
+	cfg.ForceTextPatterns = mergeUnique(loaded.ForceTextPatterns, forceText)
+	cfg.ForceBinaryPatterns = mergeUnique(loaded.ForceBinaryPatterns, forceBinary)
+
+	// output path: CLI wins, fallback to config, fallback to default
+	switch {
+	case outputPath != "":
+		cfg.OutputPath = outputPath
+	case loaded.OutputPath != "":
+		cfg.OutputPath = loaded.OutputPath
+	}
+
+	// boolean output flags: CLI wins over config
+	cfg.NoSummary = noSummary || loaded.NoSummary
+	cfg.NoIndex = noIndex || loaded.NoIndex
+	cfg.NoGitLog = noGitLog || loaded.NoGitLog
+	cfg.NoContent = noContent || loaded.NoContent
+	cfg.Silent = silent || loaded.Silent
+
+	return cfg
 }
 
-// buildCLIRules extracts only the traversal rules from raw CLI args in order.
-// Used both by buildFilterRules and --save-config.
-func buildCLIRules(args []string, includes, excludes []string) []filter.Rule {
+// buildSaveConfig constructs a FullConfig for --save-config from CLI args only.
+func buildSaveConfig(
+	args []string,
+	includes, excludes, pickPaths []string,
+	forceText, forceBinary []string,
+	outputPath string,
+	noSummary, noIndex, noGitLog, noContent, silent bool,
+) config.FullConfig {
+	cfg := config.FullConfig{
+		Generated: time.Now(),
+	}
+
+	cfg.PickPaths = pickPaths
+	cfg.FilterRules = buildCLIFilterRules(args, includes, excludes)
+	cfg.ForceTextPatterns = forceText
+	cfg.ForceBinaryPatterns = forceBinary
+	cfg.OutputPath = outputPath
+	cfg.NoSummary = noSummary
+	cfg.NoIndex = noIndex
+	cfg.NoGitLog = noGitLog
+	cfg.NoContent = noContent
+	cfg.Silent = silent
+
+	return cfg
+}
+
+// buildCLIFilterRules extracts ordered traversal filter rules from raw CLI args.
+func buildCLIFilterRules(args []string, includes, excludes []string) []filter.Rule {
 	includeSet := make(map[string]int)
 	excludeSet := make(map[string]int)
 	for _, v := range includes {
@@ -114,4 +180,17 @@ func hasBaselineFlag(args []string) bool {
 		}
 	}
 	return false
+}
+
+// mergeUnique merges two string slices, preserving order and removing duplicates.
+func mergeUnique(base, override []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, v := range append(base, override...) {
+		if !seen[v] {
+			seen[v] = true
+			result = append(result, v)
+		}
+	}
+	return result
 }

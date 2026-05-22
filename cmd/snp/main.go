@@ -7,7 +7,6 @@ import (
 
 	cli "github.com/urfave/cli/v3"
 
-	"github.com/neox5/snp/internal/snapshot"
 	"github.com/neox5/snp/internal/version"
 )
 
@@ -30,8 +29,7 @@ Two modes (mutually exclusive):
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "output",
-				Usage: "Set output file path",
-				Value: snapshot.DefaultOutputName,
+				Usage: "Set output file path (default: snapshot.snp)",
 			},
 			// Mode 1 — Traversal baseline
 			&cli.BoolFlag{
@@ -106,7 +104,11 @@ Two modes (mutually exclusive):
 			},
 			&cli.BoolFlag{
 				Name:  "save-config",
-				Usage: "Save current traversal flags to .snpconfig in source directory and exit",
+				Usage: "Save current flags to .snpconfig in source directory and exit",
+			},
+			&cli.BoolFlag{
+				Name:  "print-config",
+				Usage: "Print current config and equivalent snp command, then exit",
 			},
 		},
 		ArgsUsage: "[DIRECTORY]",

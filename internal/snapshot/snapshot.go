@@ -6,32 +6,42 @@ import (
 	"io"
 	"time"
 
+	"github.com/neox5/snp/internal/config"
 	"github.com/neox5/snp/internal/file"
 	"github.com/neox5/snp/internal/gitlog"
 	"github.com/neox5/snp/internal/pick"
 	"github.com/neox5/snp/internal/writer"
 )
 
-// Snapshot represents the complete snapshot data
+// Snapshot represents the complete snapshot data.
 type Snapshot struct {
 	GitLogLines GitLogLines
 	Files       []*file.File
 	Layout      []Content
 }
 
-// GitLogLines represents git log output
+// GitLogLines represents git log output.
 type GitLogLines []string
 
-// Build creates a complete snapshot
-func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput string) (*Snapshot, error) {
+// Build creates a complete snapshot.
+func Build(ctx context.Context, cfg config.FullConfig, absSourceDir string, absOutput string) (*Snapshot, error) {
 	snap := &Snapshot{}
 
 	var files []*file.File
 	var textFiles, binaryFiles int
 	var err error
 
-	switch cfg.Mode {
-	case ModeTraversal:
+	if cfg.IsPick() {
+		files, textFiles, binaryFiles, err = pick.Collect(
+			absSourceDir,
+			cfg.PickPaths,
+			cfg.ForceTextPatterns,
+			cfg.ForceBinaryPatterns,
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
 		if !cfg.NoGitLog && gitlog.HasRepo(absSourceDir) {
 			gitLogData, err := gitlog.Collect(ctx, absSourceDir)
 			if err != nil {
@@ -50,20 +60,6 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		if err != nil {
 			return nil, err
 		}
-
-	case ModePick:
-		files, textFiles, binaryFiles, err = pick.Collect(
-			absSourceDir,
-			cfg.PickPaths,
-			cfg.ForceTextPatterns,
-			cfg.ForceBinaryPatterns,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-	default:
-		return nil, fmt.Errorf("unknown mode: %d", cfg.Mode)
 	}
 
 	snap.Files = files
@@ -75,7 +71,6 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 	var layout []Content
 	needsDivider := false
 
-	// helper: prepend divider before all sections after the first
 	section := func(contents ...Content) {
 		if needsDivider {
 			layout = append(layout, newDivider())
@@ -84,14 +79,12 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		needsDivider = true
 	}
 
-	// summary
 	if !cfg.NoSummary {
 		section(
 			newSummary(timestamp, totalFiles, textFiles, binaryFiles, &totalLines),
 		)
 	}
 
-	// index
 	if !cfg.NoIndex {
 		section(
 			newHeader("File Index"),
@@ -99,7 +92,6 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		)
 	}
 
-	// git log
 	if !cfg.NoGitLog && len(snap.GitLogLines) > 0 {
 		section(
 			newHeader("Git Log (git adog)"),
@@ -107,7 +99,6 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 		)
 	}
 
-	// file content sections
 	if !cfg.NoContent {
 		for _, f := range snap.Files {
 			section(
@@ -132,7 +123,7 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 	return snap, nil
 }
 
-// WriteTo writes the snapshot to the output
+// WriteTo writes the snapshot to the writer.
 func (s *Snapshot) WriteTo(w io.Writer) (int64, error) {
 	if s.Layout == nil {
 		return 0, fmt.Errorf("layout not initialized")

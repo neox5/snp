@@ -4,27 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/neox5/snp/internal/config"
 )
 
-// DefaultOutputName is the default snapshot output filename
-const DefaultOutputName = "snapshot.snp"
-
-func resolveOutputPath(outputPath string) (absOutput string, err error) {
-	if outputPath == "" {
-		outputPath = DefaultOutputName
-	}
-
-	absOutput, err = filepath.Abs(outputPath)
-	if err != nil {
-		return "", fmt.Errorf("cannot resolve output path %q: %w", outputPath, err)
-	}
-
-	return absOutput, nil
-}
-
-// ValidateAndResolve validates the config and resolves paths
-func ValidateAndResolve(cfg Config) (absSourceDir, absOutput string, err error) {
-	// Validate source directory
+// ValidateAndResolve validates the config and resolves paths.
+func ValidateAndResolve(cfg config.FullConfig) (absSourceDir, absOutput string, err error) {
 	srcInfo, err := os.Stat(cfg.SourceDir)
 	if err != nil {
 		return "", "", fmt.Errorf("cannot stat directory %q: %w", cfg.SourceDir, err)
@@ -38,10 +23,13 @@ func ValidateAndResolve(cfg Config) (absSourceDir, absOutput string, err error) 
 		return "", "", fmt.Errorf("cannot resolve source directory: %w", err)
 	}
 
-	// Resolve output path
-	absOutput, err = resolveOutputPath(cfg.OutputPath)
+	outputPath := cfg.OutputPath
+	if outputPath == "" {
+		outputPath = config.DefaultOutputPath
+	}
+	absOutput, err = filepath.Abs(outputPath)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("cannot resolve output path %q: %w", outputPath, err)
 	}
 
 	return absSourceDir, absOutput, nil

@@ -28,10 +28,18 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		sourceDir = c.Args().First()
 	}
 
-	silent := c.Bool("silent")
 	pickPaths := c.StringSlice("pick")
 	includes := c.StringSlice("include")
 	excludes := c.StringSlice("exclude")
+	forceText := c.StringSlice("force-text")
+	forceBinary := c.StringSlice("force-binary")
+	outputPath := c.String("output")
+	noSummary := c.Bool("no-summary")
+	noIndex := c.Bool("no-index")
+	noGitLog := c.Bool("no-git-log")
+	noContent := c.Bool("no-content")
+	silent := c.Bool("silent")
+	dryRun := c.Bool("dry-run")
 
 	hasPick := len(pickPaths) > 0
 	hasTraversal := len(includes) > 0 || len(excludes) > 0 ||
@@ -41,58 +49,60 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return fmt.Errorf("--pick cannot be combined with --include, --exclude, --include-all, --exclude-all, or --exclude-defaults")
 	}
 
-	// --save-config not allowed in pick mode
-	if c.Bool("save-config") && hasPick {
-		return fmt.Errorf("--save-config cannot be combined with --pick")
+	// --save-config
+	if c.Bool("save-config") {
+		saveCfg := buildSaveConfig(
+			os.Args[1:],
+			includes, excludes, pickPaths,
+			forceText, forceBinary,
+			outputPath,
+			noSummary, noIndex, noGitLog, noContent, silent,
+		)
+		saveCfg.Generated = time.Now()
+		if err := config.Save(sourceDir, saveCfg); err != nil {
+			return err
+		}
+		if !silent {
+			fmt.Printf("Saved config to %s\n", config.ConfigFileName)
+		}
+		return nil
 	}
 
-	mode := snapshot.ModeTraversal
-	if hasPick {
-		mode = snapshot.ModePick
-	}
-
-	var filterRules []filter.Rule
-
-	if mode == snapshot.ModeTraversal {
-		// load .snpconfig unless --no-config
-		var configRules []filter.Rule
+	// --print-config
+	if c.Bool("print-config") {
+		var loaded config.FullConfig
 		if !c.Bool("no-config") {
 			var err error
-			configRules, err = config.Load(sourceDir)
+			loaded, err = config.Load(sourceDir)
 			if err != nil {
 				return err
 			}
 		}
+		config.Print(loaded)
+		return nil
+	}
 
-		// --save-config: write current CLI traversal flags and exit
-		if c.Bool("save-config") {
-			cliRules := buildCLIRules(os.Args[1:], includes, excludes)
-			if err := config.Save(sourceDir, cliRules); err != nil {
-				return err
-			}
-			if !silent {
-				fmt.Printf("Saved config to %s\n", config.ConfigFileName)
-			}
-			return nil
+	// load .snpconfig unless --no-config
+	var loaded config.FullConfig
+	if !c.Bool("no-config") {
+		var err error
+		loaded, err = config.Load(sourceDir)
+		if err != nil {
+			return err
 		}
-
-		filterRules = buildFilterRules(os.Args[1:], includes, excludes, configRules)
 	}
 
-	cfg := snapshot.Config{
-		Mode:                mode,
-		SourceDir:           sourceDir,
-		OutputPath:          c.String("output"),
-		DryRun:              c.Bool("dry-run"),
-		NoSummary:           c.Bool("no-summary"),
-		NoIndex:             c.Bool("no-index"),
-		NoGitLog:            c.Bool("no-git-log"),
-		NoContent:           c.Bool("no-content"),
-		FilterRules:         filterRules,
-		PickPaths:           pickPaths,
-		ForceTextPatterns:   c.StringSlice("force-text"),
-		ForceBinaryPatterns: c.StringSlice("force-binary"),
-	}
+	cfg := buildFullConfig(
+		os.Args[1:],
+		loaded,
+		includes, excludes, pickPaths,
+		forceText, forceBinary,
+		outputPath,
+		noSummary, noIndex, noGitLog, noContent, silent, dryRun,
+		sourceDir,
+	)
+
+	config.ApplyDefaults(&cfg)
 
 	absSourceDir, absOutput, err := snapshot.ValidateAndResolve(cfg)
 	if err != nil {
@@ -107,7 +117,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	}
 
 	if cfg.DryRun {
-		if !silent {
+		if !cfg.Silent {
 			for _, f := range snap.Files {
 				fmt.Println(f.RelPath)
 			}
@@ -127,7 +137,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 
 	elapsed := time.Since(start)
 
-	if !silent {
+	if !cfg.Silent {
 		fmt.Printf("Snapshot created: %s (%s)\n", absOutput, formatDuration(elapsed))
 	}
 
