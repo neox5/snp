@@ -15,9 +15,10 @@ import (
 
 // Snapshot represents the complete snapshot data.
 type Snapshot struct {
-	GitLogLines GitLogLines
-	Files       []*file.File
-	Layout      []Content
+	GitLogLines   GitLogLines
+	Files         []*file.File
+	CollapsedDirs []file.DirEntry
+	Layout        []Content
 }
 
 // GitLogLines represents git log output.
@@ -28,6 +29,7 @@ func Build(ctx context.Context, cfg config.FullConfig, absSourceDir string, absO
 	snap := &Snapshot{}
 
 	var files []*file.File
+	var collapsedDirs []file.DirEntry
 	var textFiles, binaryFiles int
 	var err error
 
@@ -50,12 +52,13 @@ func Build(ctx context.Context, cfg config.FullConfig, absSourceDir string, absO
 			snap.GitLogLines = gitLogData.Lines
 		}
 
-		files, textFiles, binaryFiles, err = file.Collect(
+		files, collapsedDirs, textFiles, binaryFiles, err = file.Collect(
 			absSourceDir,
 			absOutput,
 			cfg.FilterRules,
 			cfg.ForceTextPatterns,
 			cfg.ForceBinaryPatterns,
+			cfg.Depth,
 		)
 		if err != nil {
 			return nil, err
@@ -63,6 +66,16 @@ func Build(ctx context.Context, cfg config.FullConfig, absSourceDir string, absO
 	}
 
 	snap.Files = files
+	snap.CollapsedDirs = collapsedDirs
+
+	// calculate total size
+	var totalSize int64
+	for _, f := range files {
+		totalSize += f.Size
+	}
+	for _, d := range collapsedDirs {
+		totalSize += d.Size
+	}
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	totalFiles := len(files)
@@ -81,14 +94,14 @@ func Build(ctx context.Context, cfg config.FullConfig, absSourceDir string, absO
 
 	if !cfg.NoSummary {
 		section(
-			newSummary(timestamp, totalFiles, textFiles, binaryFiles, &totalLines),
+			newSummary(timestamp, totalFiles, textFiles, binaryFiles, totalSize, &totalLines),
 		)
 	}
 
 	if !cfg.NoIndex {
 		section(
 			newHeader("File Index"),
-			newIndex(snap.Files),
+			newIndex(snap.Files, snap.CollapsedDirs),
 		)
 	}
 

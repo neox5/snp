@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,17 +21,15 @@ const (
 // It is used across CLI parsing, config file I/O, and snapshot execution.
 type FullConfig struct {
 	Generated time.Time
-
+	// depth — -1 means full traversal
+	Depth int
 	// file selection — traversal mode (ordered, last-match-wins)
 	FilterRules []filter.Rule
-
 	// file selection — pick mode (mutually exclusive with FilterRules)
 	PickPaths []string
-
 	// binary overrides
 	ForceTextPatterns   []string
 	ForceBinaryPatterns []string
-
 	// output
 	SourceDir  string
 	OutputPath string
@@ -70,6 +69,7 @@ func Load(dir string) (FullConfig, error) {
 	defer f.Close()
 
 	var cfg FullConfig
+	cfg.Depth = -1
 	scanner := bufio.NewScanner(f)
 	lineNum := 0
 
@@ -111,8 +111,15 @@ func Save(dir string, cfg FullConfig) error {
 	if ts.IsZero() {
 		ts = time.Now()
 	}
-	if err := writeLine(w, "generated "+ts.Local().Format(time.RFC3339)); err != nil {
+	if err := writeLine(w, "generated "+ts.Format(time.RFC3339)); err != nil {
 		return err
+	}
+
+	// depth — only if not full traversal
+	if cfg.Depth >= 0 {
+		if err := writeLine(w, fmt.Sprintf("depth %d", cfg.Depth)); err != nil {
+			return err
+		}
 	}
 
 	// filter rules (traversal, ordered)
@@ -190,10 +197,17 @@ func Print(cfg FullConfig) {
 		fmt.Println("# generated: " + cfg.Generated.Local().Format("2006-01-02 15:04:05"))
 	}
 
-	// traversal rules
+	// depth
+	if cfg.Depth >= 0 {
+		fmt.Println()
+		fmt.Println("# depth")
+		fmt.Printf("depth %d\n", cfg.Depth)
+	}
+
+	// filters
 	if len(cfg.FilterRules) > 0 {
 		fmt.Println()
-		fmt.Println("# traversal")
+		fmt.Println("# filters")
 		for _, r := range cfg.FilterRules {
 			line, _ := serializeRule(r)
 			fmt.Println(line)
@@ -272,6 +286,17 @@ func parseLine(line string, lineNum int, cfg *FullConfig) error {
 			return fmt.Errorf("%s line %d: invalid generated timestamp: %w", ConfigFileName, lineNum, err)
 		}
 		cfg.Generated = t
+		return nil
+	}
+
+	// depth
+	if val, ok := strings.CutPrefix(line, "depth "); ok {
+		val = strings.TrimSpace(val)
+		d, err := strconv.Atoi(val)
+		if err != nil || d < 0 {
+			return fmt.Errorf("%s line %d: depth must be a non-negative integer", ConfigFileName, lineNum)
+		}
+		cfg.Depth = d
 		return nil
 	}
 
@@ -375,6 +400,10 @@ func writeLine(w *bufio.Writer, line string) error {
 func buildCommand(cfg FullConfig) string {
 	var parts []string
 	parts = append(parts, "snp")
+
+	if cfg.Depth >= 0 {
+		parts = append(parts, "--depth", fmt.Sprintf("%d", cfg.Depth))
+	}
 
 	for _, r := range cfg.FilterRules {
 		switch r.Type {

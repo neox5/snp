@@ -31,6 +31,12 @@ Two modes (mutually exclusive):
 				Name:  "output",
 				Usage: "Set output file path (default: snapshot.snp)",
 			},
+			// Depth
+			&cli.IntFlag{
+				Name:  "depth",
+				Usage: "Limit traversal depth (0 = root files only, -1 = full traversal)",
+				Value: -1,
+			},
 			// Mode 1 — Traversal baseline
 			&cli.BoolFlag{
 				Name:  "include-all",

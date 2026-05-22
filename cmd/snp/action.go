@@ -9,6 +9,7 @@ import (
 	cli "github.com/urfave/cli/v3"
 
 	"github.com/neox5/snp/internal/config"
+	"github.com/neox5/snp/internal/file"
 	"github.com/neox5/snp/internal/filter"
 	"github.com/neox5/snp/internal/snapshot"
 )
@@ -40,6 +41,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	noContent := c.Bool("no-content")
 	silent := c.Bool("silent")
 	dryRun := c.Bool("dry-run")
+	depth := c.Int("depth")
 
 	hasPick := len(pickPaths) > 0
 	hasTraversal := len(includes) > 0 || len(excludes) > 0 ||
@@ -47,6 +49,9 @@ func runAction(ctx context.Context, c *cli.Command) error {
 
 	if hasPick && hasTraversal {
 		return fmt.Errorf("--pick cannot be combined with --include, --exclude, --include-all, --exclude-all, or --exclude-defaults")
+	}
+	if hasPick && depth != -1 {
+		return fmt.Errorf("--depth cannot be combined with --pick")
 	}
 
 	// --save-config
@@ -57,6 +62,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 			forceText, forceBinary,
 			outputPath,
 			noSummary, noIndex, noGitLog, noContent, silent,
+			depth,
 		)
 		saveCfg.Generated = time.Now()
 		if err := config.Save(sourceDir, saveCfg); err != nil {
@@ -99,6 +105,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		forceText, forceBinary,
 		outputPath,
 		noSummary, noIndex, noGitLog, noContent, silent, dryRun,
+		depth,
 		sourceDir,
 	)
 
@@ -119,7 +126,14 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	if cfg.DryRun {
 		if !cfg.Silent {
 			for _, f := range snap.Files {
-				fmt.Println(f.RelPath)
+				if f.IsBinary {
+					fmt.Printf("%s (binary, %s)\n", f.RelPath, file.FormatSize(f.Size))
+				} else {
+					fmt.Printf("%s (%d lines, %s)\n", f.RelPath, len(f.Lines), file.FormatSize(f.Size))
+				}
+			}
+			for _, d := range snap.CollapsedDirs {
+				fmt.Printf("%s (%d items, %s)\n", d.RelPath, d.ItemCount, file.FormatSize(d.Size))
 			}
 		}
 		return nil

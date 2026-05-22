@@ -9,14 +9,6 @@ import (
 )
 
 // buildFullConfig constructs a config.FullConfig from CLI args and loaded config.
-//
-// Merge order for filter rules:
-//
-//	[implicit baseline]   — suppressed if baseline present in args OR loaded config
-//	[config rules]        — from .snpconfig
-//	[CLI rules in order]  — from current invocation
-//
-// All other fields: CLI flags override loaded config values.
 func buildFullConfig(
 	args []string,
 	loaded config.FullConfig,
@@ -24,6 +16,7 @@ func buildFullConfig(
 	forceText, forceBinary []string,
 	outputPath string,
 	noSummary, noIndex, noGitLog, noContent, silent, dryRun bool,
+	depth int,
 	sourceDir string,
 ) config.FullConfig {
 	cfg := config.FullConfig{
@@ -31,7 +24,16 @@ func buildFullConfig(
 		DryRun:    dryRun,
 	}
 
-	// pick mode — CLI picks override config picks entirely
+	// depth: CLI wins if explicitly set (not -1), else use loaded, else -1
+	if depth != -1 {
+		cfg.Depth = depth
+	} else if loaded.Depth != -1 {
+		cfg.Depth = loaded.Depth
+	} else {
+		cfg.Depth = -1
+	}
+
+	// pick mode — CLI picks override loaded picks entirely
 	if len(pickPaths) > 0 {
 		cfg.PickPaths = pickPaths
 	} else if len(loaded.PickPaths) > 0 {
@@ -57,19 +59,18 @@ func buildFullConfig(
 		cfg.FilterRules = rules
 	}
 
-	// force overrides: merge config + CLI
+	// force overrides: merge loaded + CLI
 	cfg.ForceTextPatterns = mergeUnique(loaded.ForceTextPatterns, forceText)
 	cfg.ForceBinaryPatterns = mergeUnique(loaded.ForceBinaryPatterns, forceBinary)
 
-	// output path: CLI wins, fallback to config, fallback to default
-	switch {
-	case outputPath != "":
+	// output path: CLI wins, fallback to loaded
+	if outputPath != "" {
 		cfg.OutputPath = outputPath
-	case loaded.OutputPath != "":
+	} else if loaded.OutputPath != "" {
 		cfg.OutputPath = loaded.OutputPath
 	}
 
-	// boolean output flags: CLI wins over config
+	// boolean output flags: CLI wins over loaded
 	cfg.NoSummary = noSummary || loaded.NoSummary
 	cfg.NoIndex = noIndex || loaded.NoIndex
 	cfg.NoGitLog = noGitLog || loaded.NoGitLog
@@ -86,9 +87,11 @@ func buildSaveConfig(
 	forceText, forceBinary []string,
 	outputPath string,
 	noSummary, noIndex, noGitLog, noContent, silent bool,
+	depth int,
 ) config.FullConfig {
 	cfg := config.FullConfig{
 		Generated: time.Now(),
+		Depth:     depth,
 	}
 
 	cfg.PickPaths = pickPaths

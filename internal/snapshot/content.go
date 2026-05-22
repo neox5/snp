@@ -2,6 +2,7 @@ package snapshot
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/neox5/snp/internal/file"
 	"github.com/neox5/snp/internal/writer"
@@ -21,41 +22,42 @@ type summary struct {
 	TotalFiles  int
 	TextFiles   int
 	BinaryFiles int
+	TotalSize   int64
 	TotalLines  *int
 }
 
 func (s summary) LineCount() int {
-	return 3
+	return 4
 }
 
 func (s summary) WriteTo(lt *writer.LineTracker) error {
 	if err := lt.WriteLine("Generated: " + s.Timestamp); err != nil {
 		return err
 	}
-
-	summary := fmt.Sprintf("Total files: %d (%d text, %d binary)",
-		s.TotalFiles, s.TextFiles, s.BinaryFiles)
-	if err := lt.WriteLine(summary); err != nil {
+	if err := lt.WriteLine(fmt.Sprintf("Total files: %d (%d text, %d binary)",
+		s.TotalFiles, s.TextFiles, s.BinaryFiles)); err != nil {
 		return err
 	}
-
-	totalLinesStr := fmt.Sprintf("Total lines: %d", *s.TotalLines)
-	return lt.WriteLine(totalLinesStr)
+	if err := lt.WriteLine("Total size: " + formatSize(s.TotalSize)); err != nil {
+		return err
+	}
+	return lt.WriteLine(fmt.Sprintf("Total lines: %d", *s.TotalLines))
 }
 
-func newSummary(timestamp string, totalFiles, textFiles, binaryFiles int, totalLines *int) Content {
+func newSummary(timestamp string, totalFiles, textFiles, binaryFiles int, totalSize int64, totalLines *int) Content {
 	return summary{
 		Timestamp:   timestamp,
 		TotalFiles:  totalFiles,
 		TextFiles:   textFiles,
 		BinaryFiles: binaryFiles,
+		TotalSize:   totalSize,
 		TotalLines:  totalLines,
 	}
 }
 
 // ===== Primitive Content Types =====
 
-// header represents a section header like "# File Index"
+// header represents a section header
 type header struct {
 	Text string
 }
@@ -73,10 +75,6 @@ func newHeader(text string) Content {
 }
 
 // divider represents the blank + separator + blank lines between sections
-// emits:
-//   (empty line)
-//   # ----------------------------------------
-//   (empty line)
 type divider struct{}
 
 func (d divider) LineCount() int {
@@ -97,7 +95,7 @@ func newDivider() Content {
 	return divider{}
 }
 
-// emptyLine represents a blank line (used within sections, e.g. after summary)
+// emptyLine represents a blank line
 type emptyLine struct{}
 
 func (e emptyLine) LineCount() int {
@@ -136,38 +134,59 @@ func newGitLog(lines GitLogLines) Content {
 	return gitLog{Lines: lines}
 }
 
-// index renders all file index entries
+// index renders all file index entries and collapsed dir entries
 type index struct {
-	Files []*file.File
+	Files         []*file.File
+	CollapsedDirs []file.DirEntry
 }
 
 func (idx index) LineCount() int {
-	return len(idx.Files)
+	return len(idx.Files) + len(idx.CollapsedDirs)
 }
 
 func (idx index) WriteTo(lt *writer.LineTracker) error {
+	type entry struct {
+		path string
+		line string
+	}
+
+	entries := make([]entry, 0, len(idx.Files)+len(idx.CollapsedDirs))
+
 	for _, f := range idx.Files {
-		var line string
 		endLine := f.StartLine + len(f.Lines) - 1
-		lineCount := len(f.Lines)
-
+		var line string
 		if f.IsBinary {
-			sizeStr := formatSize(f.Size)
 			line = fmt.Sprintf("%s [%d-%d] (binary, %s)",
-				f.RelPath, f.StartLine, endLine, sizeStr)
+				f.RelPath, f.StartLine, endLine, formatSize(f.Size))
 		} else {
-			sizeStr := formatSize(f.Size)
 			line = fmt.Sprintf("%s [%d-%d] (%d lines, %s)",
-				f.RelPath, f.StartLine, endLine, lineCount, sizeStr)
+				f.RelPath, f.StartLine, endLine, len(f.Lines), formatSize(f.Size))
 		}
+		entries = append(entries, entry{path: f.RelPath, line: line})
+	}
 
-		if err := lt.WriteLine(line); err != nil {
+	for _, d := range idx.CollapsedDirs {
+		line := fmt.Sprintf("%s (%d items, %s)", d.RelPath, d.ItemCount, formatSize(d.Size))
+		entries = append(entries, entry{path: d.RelPath, line: line})
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].path < entries[j].path
+	})
+
+	for _, e := range entries {
+		if err := lt.WriteLine(e.line); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+func newIndex(files []*file.File, collapsedDirs []file.DirEntry) Content {
+	return index{Files: files, CollapsedDirs: collapsedDirs}
+}
+
+// formatSize formats byte size in human-readable format
 func formatSize(bytes int64) string {
 	const (
 		KB = 1024
@@ -189,10 +208,6 @@ func formatSize(bytes int64) string {
 	default:
 		return fmt.Sprintf("%.1f GB", float64(bytes)/GB)
 	}
-}
-
-func newIndex(files []*file.File) Content {
-	return index{Files: files}
 }
 
 // fileContent renders a single file's content
