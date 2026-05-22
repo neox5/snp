@@ -12,11 +12,16 @@ const (
 
 // Config holds the runtime configuration for a snapshot run.
 type Config struct {
-	Mode          Mode
-	SourceDir     string
-	OutputPath    string
-	IncludeGitLog bool
-	DryRun        bool
+	Mode      Mode
+	SourceDir string
+	OutputPath string
+	DryRun    bool
+
+	// Output sections
+	NoSummary  bool
+	NoIndex    bool
+	NoGitLog   bool
+	NoContent  bool
 
 	// Mode 1 — Traversal
 	FilterRules         []filter.Rule

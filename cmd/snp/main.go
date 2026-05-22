@@ -65,11 +65,24 @@ Two modes (mutually exclusive):
 				Name:  "pick",
 				Usage: "Directly include file by path or glob, no traversal (repeatable)",
 			},
-			// Shared
+			// Output sections
 			&cli.BoolFlag{
-				Name:  "exclude-git-log",
-				Usage: "Omit the Git log section (included by default)",
+				Name:  "no-summary",
+				Usage: "Omit the summary header",
 			},
+			&cli.BoolFlag{
+				Name:  "no-index",
+				Usage: "Omit the file index",
+			},
+			&cli.BoolFlag{
+				Name:  "no-git-log",
+				Usage: "Omit the Git log section",
+			},
+			&cli.BoolFlag{
+				Name:  "no-content",
+				Usage: "Omit file contents (index and metadata only)",
+			},
+			// Shared
 			&cli.BoolFlag{
 				Name:  "dry-run",
 				Usage: "Print files that would be included without creating output",

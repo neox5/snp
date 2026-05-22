@@ -32,7 +32,7 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 
 	switch cfg.Mode {
 	case ModeTraversal:
-		if cfg.IncludeGitLog && gitlog.HasRepo(absSourceDir) {
+		if !cfg.NoGitLog && gitlog.HasRepo(absSourceDir) {
 			gitLogData, err := gitlog.Collect(ctx, absSourceDir)
 			if err != nil {
 				return nil, fmt.Errorf("failed to collect git log: %w", err)
@@ -73,43 +73,51 @@ func Build(ctx context.Context, cfg Config, absSourceDir string, absOutput strin
 	totalLines := 0
 
 	var layout []Content
+	needsDivider := false
 
-	layout = append(layout,
-		newSummary(timestamp, totalFiles, textFiles, binaryFiles, &totalLines),
-		newEmptyLine(),
-	)
+	// helper: prepend divider before all sections after the first
+	section := func(contents ...Content) {
+		if needsDivider {
+			layout = append(layout, newDivider())
+		}
+		layout = append(layout, contents...)
+		needsDivider = true
+	}
 
-	layout = append(layout,
-		newHeader("File Index"),
-		newIndex(snap.Files),
-		newEmptyLine(),
-		newSeparator(),
-		newEmptyLine(),
-	)
-
-	if len(snap.GitLogLines) > 0 {
-		layout = append(layout,
-			newHeader("Git Log (git adog)"),
-			newGitLog(snap.GitLogLines),
-			newEmptyLine(),
-			newSeparator(),
-			newEmptyLine(),
+	// summary
+	if !cfg.NoSummary {
+		section(
+			newSummary(timestamp, totalFiles, textFiles, binaryFiles, &totalLines),
 		)
 	}
 
-	for i, f := range snap.Files {
-		layout = append(layout,
-			newHeader(f.RelPath),
-			newFileContent(f),
+	// index
+	if !cfg.NoIndex {
+		section(
+			newHeader("File Index"),
+			newIndex(snap.Files),
 		)
-		if i < len(snap.Files)-1 {
-			layout = append(layout,
-				newEmptyLine(),
-				newEmptyLine(),
+	}
+
+	// git log
+	if !cfg.NoGitLog && len(snap.GitLogLines) > 0 {
+		section(
+			newHeader("Git Log (git adog)"),
+			newGitLog(snap.GitLogLines),
+		)
+	}
+
+	// file content sections
+	if !cfg.NoContent {
+		for _, f := range snap.Files {
+			section(
+				newHeader(f.RelPath),
+				newFileContent(f),
 			)
 		}
 	}
 
+	// assign start lines
 	currentLine := 1
 	for _, content := range layout {
 		if fc, ok := content.(fileContent); ok {

@@ -21,7 +21,7 @@ type summary struct {
 	TotalFiles  int
 	TextFiles   int
 	BinaryFiles int
-	TotalLines  *int // Pointer to allow updating after layout construction
+	TotalLines  *int
 }
 
 func (s summary) LineCount() int {
@@ -43,7 +43,6 @@ func (s summary) WriteTo(lt *writer.LineTracker) error {
 	return lt.WriteLine(totalLinesStr)
 }
 
-// newSummary creates a new summary content item with mutable totalLines
 func newSummary(timestamp string, totalFiles, textFiles, binaryFiles int, totalLines *int) Content {
 	return summary{
 		Timestamp:   timestamp,
@@ -56,7 +55,7 @@ func newSummary(timestamp string, totalFiles, textFiles, binaryFiles int, totalL
 
 // ===== Primitive Content Types =====
 
-// header represents a section header like "# Git Log (git adog)"
+// header represents a section header like "# File Index"
 type header struct {
 	Text string
 }
@@ -69,28 +68,36 @@ func (h header) WriteTo(lt *writer.LineTracker) error {
 	return lt.WriteLine("# " + h.Text)
 }
 
-// newHeader creates a new header content item
 func newHeader(text string) Content {
 	return header{Text: text}
 }
 
-// separator represents the "# ----------------------------------------" line
-type separator struct{}
+// divider represents the blank + separator + blank lines between sections
+// emits:
+//   (empty line)
+//   # ----------------------------------------
+//   (empty line)
+type divider struct{}
 
-func (s separator) LineCount() int {
-	return 1
+func (d divider) LineCount() int {
+	return 3
 }
 
-func (s separator) WriteTo(lt *writer.LineTracker) error {
-	return lt.WriteLine("# ----------------------------------------")
+func (d divider) WriteTo(lt *writer.LineTracker) error {
+	if err := lt.WriteLine(""); err != nil {
+		return err
+	}
+	if err := lt.WriteLine("# ----------------------------------------"); err != nil {
+		return err
+	}
+	return lt.WriteLine("")
 }
 
-// newSeparator creates a new separator content item
-func newSeparator() Content {
-	return separator{}
+func newDivider() Content {
+	return divider{}
 }
 
-// emptyLine represents a blank line
+// emptyLine represents a blank line (used within sections, e.g. after summary)
 type emptyLine struct{}
 
 func (e emptyLine) LineCount() int {
@@ -101,7 +108,6 @@ func (e emptyLine) WriteTo(lt *writer.LineTracker) error {
 	return lt.WriteLine("")
 }
 
-// newEmptyLine creates a new empty line content item
 func newEmptyLine() Content {
 	return emptyLine{}
 }
@@ -126,7 +132,6 @@ func (g gitLog) WriteTo(lt *writer.LineTracker) error {
 	return nil
 }
 
-// newGitLog creates a new git log content item
 func newGitLog(lines GitLogLines) Content {
 	return gitLog{Lines: lines}
 }
@@ -163,7 +168,6 @@ func (idx index) WriteTo(lt *writer.LineTracker) error {
 	return nil
 }
 
-// formatSize formats byte size in human-readable format
 func formatSize(bytes int64) string {
 	const (
 		KB = 1024
@@ -187,7 +191,6 @@ func formatSize(bytes int64) string {
 	}
 }
 
-// newIndex creates a new file index content item
 func newIndex(files []*file.File) Content {
 	return index{Files: files}
 }
@@ -210,7 +213,6 @@ func (f fileContent) WriteTo(lt *writer.LineTracker) error {
 	return nil
 }
 
-// newFileContent creates a new file content item
 func newFileContent(f *file.File) Content {
 	return fileContent{File: f}
 }
