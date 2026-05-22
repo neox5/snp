@@ -76,10 +76,11 @@ func (cfg Config) Print() {
 
 	fmt.Println()
 	fmt.Println("# equivalent command")
-	fmt.Println(buildCommand(cfg))
+	fmt.Println(cfg.BuildCommand())
 }
 
-func buildCommand(cfg Config) string {
+// BuildCommand returns the equivalent CLI command string for cfg.
+func (cfg Config) BuildCommand() string {
 	var parts []string
 	parts = append(parts, "snp")
 
@@ -102,19 +103,10 @@ func buildCommand(cfg Config) string {
 		parts = append(parts, "--pick", p)
 	}
 
-	for _, p := range cfg.ForceTextPatterns {
-		parts = append(parts, "--force-text", p)
-	}
-	for _, p := range cfg.ForceBinaryPatterns {
-		parts = append(parts, "--force-binary", p)
-	}
-
 	if cfg.Depth >= 0 {
 		parts = append(parts, "--depth", strconv.Itoa(cfg.Depth))
 	}
-	if cfg.OutputPath != "" && cfg.OutputPath != DefaultOutputPath {
-		parts = append(parts, "--output", cfg.OutputPath)
-	}
+
 	if cfg.NoSummary {
 		parts = append(parts, "--no-summary")
 	}
@@ -129,6 +121,16 @@ func buildCommand(cfg Config) string {
 	}
 	if cfg.Silent {
 		parts = append(parts, "--silent")
+	}
+	if cfg.OutputPath != "" && cfg.OutputPath != DefaultOutputPath {
+		parts = append(parts, "--output", cfg.OutputPath)
+	}
+
+	for _, p := range cfg.ForceTextPatterns {
+		parts = append(parts, "--force-text", p)
+	}
+	for _, p := range cfg.ForceBinaryPatterns {
+		parts = append(parts, "--force-binary", p)
 	}
 
 	return strings.Join(parts, " ")

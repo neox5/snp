@@ -91,6 +91,10 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return err
 	}
 
+	if !cfg.Silent {
+		fmt.Println(cfg.BuildCommand())
+	}
+
 	absSourceDir, absOutput, err := snapshot.ValidateAndResolve(cfg)
 	if err != nil {
 		return err
@@ -105,6 +109,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 
 	if cfg.DryRun {
 		if !cfg.Silent {
+			fmt.Println()
 			for _, f := range snap.Files {
 				if f.IsBinary {
 					fmt.Printf("%s (binary, %s)\n", f.RelPath, file.FormatSize(f.Size))

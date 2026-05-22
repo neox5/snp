@@ -45,6 +45,8 @@ func Load(dir string) (Config, error) {
 		return newConfig(), fmt.Errorf("reading %s: %w", ConfigFileName, err)
 	}
 
+	fmt.Println("Loaded config: " + ConfigFileName)
+
 	return cfg, nil
 }
 
