@@ -10,11 +10,10 @@ import (
 
 	"github.com/neox5/snp/internal/config"
 	"github.com/neox5/snp/internal/file"
-	"github.com/neox5/snp/internal/filter"
 	"github.com/neox5/snp/internal/snapshot"
 )
 
-func buildParamsFromCLI(c *cli.Command) config.Params {
+func cliToParams(c *cli.Command) config.Params {
 	sourceDir := "."
 	if c.NArg() > 0 {
 		sourceDir = c.Args().First()
@@ -28,8 +27,6 @@ func buildParamsFromCLI(c *cli.Command) config.Params {
 		PrintConfig:         c.Bool("print-config"),
 		DryRun:              c.Bool("dry-run"),
 		Depth:               c.Int("depth"),
-		Includes:            c.StringSlice("include"),
-		Excludes:            c.StringSlice("exclude"),
 		PickPaths:           c.StringSlice("pick"),
 		ForceTextPatterns:   c.StringSlice("force-text"),
 		ForceBinaryPatterns: c.StringSlice("force-binary"),
@@ -45,35 +42,21 @@ func buildParamsFromCLI(c *cli.Command) config.Params {
 
 func runAction(ctx context.Context, c *cli.Command) error {
 	if c.Bool("show-defaults") {
-		fmt.Println("Default exclude patterns:")
-		for _, p := range filter.DefaultPatterns {
-			fmt.Println(" ", p)
-		}
-		fmt.Println("\nPlus patterns from .gitignore (if present).")
+		config.PrintDefaultExcludes()
 		return nil
 	}
 
-	p := buildParamsFromCLI(c)
-
-	if p.VerboseLevel >= 1 {
-		p.Print()
-		fmt.Println()
+	p := cliToParams(c)
+	cfg, err := config.LoadConfig(p)
+	if err != nil {
+		return err
 	}
 
-	hasPick := len(p.PickPaths) > 0
-	hasTraversal := len(p.Includes) > 0 || len(p.Excludes) > 0 ||
-		c.Bool("include-all") || c.Bool("exclude-all") || c.Bool("exclude-defaults")
-
-	if hasPick && hasTraversal {
-		return fmt.Errorf("--pick cannot be combined with --include, --exclude, --include-all, --exclude-all, or --exclude-defaults")
-	}
-	if hasPick && p.Depth != -1 {
-		return fmt.Errorf("--depth cannot be combined with --pick")
+	if err := cfg.Validate(); err != nil {
+		return err
 	}
 
 	if p.SaveConfig {
-		cfg := config.FromParamsOnly(p, false)
-		cfg.Generated = time.Now()
 		if err := cfg.Save(p.SourceDir); err != nil {
 			return err
 		}
@@ -84,17 +67,8 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	}
 
 	if p.PrintConfig {
-		cfg, err := config.Load(p.SourceDir)
-		if err != nil {
-			return err
-		}
-		cfg.Serialize()
+		cfg.Print()
 		return nil
-	}
-
-	cfg, err := config.FromParams(p, p.VerboseLevel >= 1)
-	if err != nil {
-		return err
 	}
 
 	if !cfg.Silent {

@@ -3,50 +3,51 @@
 package filter
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
-
-// DefaultPatterns are the patterns applied by --exclude-defaults.
-var DefaultPatterns = []string{
-	// VCS and dependencies
-	".git/",
-	"node_modules/",
-	".venv/",
-	"venv/",
-	"__pycache__/",
-	".pytest_cache/",
-	"dist/",
-	"build/",
-	"target/",
-	"vendor/",
-
-	// Common artifacts
-	"*.log",
-	"*.tmp",
-
-	// Snapshot files themselves
-	"**/*.snp",
-}
 
 // RuleType defines the kind of rule.
 type RuleType int
 
 const (
-	RuleInclude         RuleType = iota // --include <pattern>
-	RuleExclude                         // --exclude <pattern>
-	RuleIncludeAll                      // --include-all
-	RuleExcludeAll                      // --exclude-all
-	RuleExcludeDefaults                 // --exclude-defaults
+	RuleInclude    RuleType = iota // --include <pattern>
+	RuleExclude                    // --exclude <pattern>
+	RuleIncludeAll                 // --include-all
+	RuleExcludeAll                 // --exclude-all
 )
 
 // Rule represents a single ordered filter rule.
 type Rule struct {
 	Type    RuleType
 	Pattern string // only used for RuleInclude and RuleExclude
+}
+
+type Rules []Rule
+
+func NewRules() Rules {
+	return Rules{}
+}
+
+func (r Rules) AddRules(rs Rules) Rules {
+	return append(r, rs...)
+}
+
+func (r Rules) AddExcludeAll() Rules {
+	return append(r, Rule{Type: RuleExcludeAll})
+}
+
+func (r Rules) AddExclude(p string) Rules {
+	return append(r, Rule{Type: RuleExclude, Pattern: p})
+}
+
+func (r Rules) AddIncludeAll() Rules {
+	return append(r, Rule{Type: RuleIncludeAll})
+}
+
+func (r Rules) AddInclude(p string) Rules {
+	return append(r, Rule{Type: RuleInclude, Pattern: p})
 }
 
 // compiled is an internal evaluated rule.
@@ -85,11 +86,6 @@ func New(sourceDir string, rules []Rule) (*Matcher, error) {
 
 		case RuleExcludeAll:
 			cr = append(cr, compiled{patterns: nil, exclude: true})
-
-		case RuleExcludeDefaults:
-			patterns := append([]string{}, DefaultPatterns...)
-			patterns = append(patterns, loadGitignore(filepath.Join(absSourceDir, ".gitignore"))...)
-			cr = append(cr, compiled{patterns: patterns, exclude: true})
 
 		case RuleInclude:
 			cr = append(cr, compiled{patterns: []string{r.Pattern}, exclude: false})
@@ -130,24 +126,4 @@ func (m *Matcher) ShouldInclude(relPath string) bool {
 	}
 
 	return result
-}
-
-// loadGitignore reads a .gitignore file and returns non-empty, non-comment lines.
-func loadGitignore(path string) []string {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimRight(scanner.Text(), "\r")
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		lines = append(lines, line)
-	}
-	return lines
 }

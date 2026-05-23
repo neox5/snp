@@ -1,48 +1,150 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/neox5/snp/internal/filter"
 )
 
 const (
-	ConfigFileName    = ".snpconfig"
 	DefaultOutputPath = "snapshot.snp"
 )
 
-// Config is the single configuration type for a snapshot run.
-type Config struct {
-	Generated time.Time
-	// depth — -1 means full traversal
-	Depth int
-	// file selection — traversal mode (ordered, last-match-wins)
-	FilterRules []filter.Rule
-	// file selection — pick mode (mutually exclusive with FilterRules)
-	PickPaths []string
-	// binary overrides
-	ForceTextPatterns   []string
-	ForceBinaryPatterns []string
-	// output
-	SourceDir  string
-	OutputPath string
-	NoSummary  bool
-	NoIndex    bool
-	NoGitLog   bool
-	NoContent  bool
-	DryRun     bool
-	Silent     bool
+type FlagType int
+
+const (
+	FlagTypeExcludeAll FlagType = iota
+	FlagTypeIncludeAll
+	FlagTypeInclude
+	FlagTypeExclude
+)
+
+func (f FlagType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(f.String())
 }
 
-// newConfig returns a Config with all sentinel values properly initialized.
-// Use this instead of Config{} wherever a blank config is needed.
-func newConfig() Config {
-	return Config{
-		Depth: -1,
+func (f *FlagType) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*f = FlagTypeFromString(s)
+	return nil
+}
+
+func (f FlagType) String() string {
+	return [...]string{"exclude-all", "include-all", "include", "exclude"}[f]
+}
+
+func FlagTypeFromString(s string) FlagType {
+	switch s {
+	case "exclude-all":
+		return FlagTypeExcludeAll
+	case "include-all":
+		return FlagTypeIncludeAll
+	case "include":
+		return FlagTypeInclude
+	case "exclude":
+		return FlagTypeExclude
+	default:
+		return FlagTypeExcludeAll
 	}
 }
 
-// IsPick reports whether the config is in pick mode.
-func (c Config) IsPick() bool {
-	return len(c.PickPaths) > 0
+type Flag struct {
+	Type  FlagType `json:"type"`
+	Value string   `json:"value"`
+}
+
+type Config struct {
+	Generated           time.Time `json:"generated"`
+	SourceDir           string    `json:"source_dir"`
+	Depth               int       `json:"depth"`
+	FilterFlags         []Flag    `json:"filter_flags"`
+	PickPaths           []string  `json:"pick_paths"`
+	ForceTextPatterns   []string  `json:"force_text_patterns"`
+	ForceBinaryPatterns []string  `json:"force_binary_patterns"`
+	OutputPath          string    `json:"output_path"`
+	NoSummary           bool      `json:"no_summary"`
+	NoIndex             bool      `json:"no_index"`
+	NoGitLog            bool      `json:"no_git_log"`
+	NoContent           bool      `json:"no_content"`
+	DryRun              bool      `json:"dry_run"`
+	Silent              bool      `json:"silent"`
+}
+
+// Merge merges other over c and returns a new Config instance
+func (c Config) Merge(other Config) *Config {
+	depth := other.Depth
+	if other.Depth == -1 {
+		depth = c.Depth
+	}
+
+	out := other.OutputPath
+	if other.OutputPath == "" {
+		out = c.OutputPath
+	}
+
+	return &Config{
+		Generated:           other.Generated,
+		SourceDir:           other.SourceDir,
+		Depth:               depth,
+		FilterFlags:         append(c.FilterFlags, other.FilterFlags...),
+		PickPaths:           mergeUnique(c.PickPaths, other.PickPaths),
+		ForceTextPatterns:   mergeUnique(c.ForceTextPatterns, other.ForceTextPatterns),
+		ForceBinaryPatterns: mergeUnique(c.ForceBinaryPatterns, other.ForceBinaryPatterns),
+		OutputPath:          out,
+		NoSummary:           other.NoSummary,
+		NoIndex:             other.NoIndex,
+		NoGitLog:            other.NoGitLog,
+		NoContent:           other.NoContent,
+		DryRun:              other.DryRun,
+		Silent:              other.Silent,
+	}
+}
+
+func (c Config) Validate() error {
+	if len(c.FilterFlags) > 0 && len(c.PickPaths) > 0 {
+		return fmt.Errorf("--pick cannot be combined with --include/exclude(-all)")
+	}
+	if len(c.PickPaths) > 0 && c.Depth > -1 {
+		return fmt.Errorf("--depth cannot be combined with --pick")
+	}
+	return nil
+}
+
+func (c Config) buildFilterRules() filter.Rules {
+	r := buildExcludeDefaultRules(c.SourceDir) // apply default excludes first
+
+	for _, f := range c.FilterFlags {
+		switch f.Type {
+		case FlagTypeExcludeAll:
+			r.AddExcludeAll()
+			continue
+		case FlagTypeIncludeAll:
+			r.AddIncludeAll()
+			continue
+		case FlagTypeExclude:
+			r.AddExclude(f.Value)
+			continue
+		case FlagTypeInclude:
+			r.AddInclude(f.Value)
+		}
+	}
+
+	return r
+}
+
+func mergeUnique(base, override []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, v := range append(base, override...) {
+		if !seen[v] {
+			seen[v] = true
+			result = append(result, v)
+		}
+	}
+	return result
 }

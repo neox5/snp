@@ -60,10 +60,6 @@ Examples:
 				Name:  "exclude-all",
 				Usage: "Baseline: exclude all files",
 			},
-			&cli.BoolFlag{
-				Name:  "exclude-defaults",
-				Usage: "Baseline: exclude default patterns and .gitignore",
-			},
 			&cli.StringSliceFlag{
 				Name:  "include",
 				Usage: "Include files matching glob pattern (repeatable, ordered)",
