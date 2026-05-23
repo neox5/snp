@@ -72,7 +72,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	}
 
 	if p.SaveConfig {
-		cfg := config.FromParamsOnly(p)
+		cfg := config.FromParamsOnly(p, false)
 		cfg.Generated = time.Now()
 		if err := cfg.Save(p.SourceDir); err != nil {
 			return err
@@ -88,11 +88,11 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		if err != nil {
 			return err
 		}
-		cfg.Print()
+		cfg.Serialize()
 		return nil
 	}
 
-	cfg, err := config.FromParams(p)
+	cfg, err := config.FromParams(p, p.VerboseLevel >= 1)
 	if err != nil {
 		return err
 	}
@@ -117,6 +117,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	if cfg.DryRun {
 		if !cfg.Silent {
 			fmt.Println()
+			fmt.Println("[Dry-Run]")
 			for _, f := range snap.Files {
 				if f.IsBinary {
 					fmt.Printf("%s (binary, %s)\n", f.RelPath, file.FormatSize(f.Size))

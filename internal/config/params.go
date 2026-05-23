@@ -37,42 +37,43 @@ type Params struct {
 // Print writes a human-readable representation of Params to stdout.
 func (p Params) Print() {
 	fmt.Println("[params]")
-	fmt.Printf("source_dir:    %s\n", p.SourceDir)
-	fmt.Printf("args:          [%s]\n", strings.Join(p.Args, " "))
-	fmt.Printf("no_config:     %v\n", p.NoConfig)
-	fmt.Printf("save_config:   %v\n", p.SaveConfig)
-	fmt.Printf("print_config:  %v\n", p.PrintConfig)
-	fmt.Printf("dry_run:       %v\n", p.DryRun)
-	fmt.Printf("verbose:       %d\n", p.VerboseLevel)
+	fmt.Printf("  source_dir:    %s\n", p.SourceDir)
+	fmt.Printf("  args:          [%s]\n", strings.Join(p.Args, " "))
+	fmt.Printf("  no_config:     %v\n", p.NoConfig)
+	fmt.Printf("  save_config:   %v\n", p.SaveConfig)
+	fmt.Printf("  print_config:  %v\n", p.PrintConfig)
+	fmt.Printf("  dry_run:       %v\n", p.DryRun)
+	fmt.Printf("  verbose:       %d\n", p.VerboseLevel)
 	fmt.Println()
-	fmt.Printf("depth:         %d\n", p.Depth)
-	fmt.Printf("includes:      %v\n", p.Includes)
-	fmt.Printf("excludes:      %v\n", p.Excludes)
-	fmt.Printf("pick_paths:    %v\n", p.PickPaths)
-	fmt.Printf("force_text:    %v\n", p.ForceTextPatterns)
-	fmt.Printf("force_binary:  %v\n", p.ForceBinaryPatterns)
-	fmt.Printf("output:        %s\n", p.OutputPath)
-	fmt.Printf("no_summary:    %v\n", p.NoSummary)
-	fmt.Printf("no_index:      %v\n", p.NoIndex)
-	fmt.Printf("no_git_log:    %v\n", p.NoGitLog)
-	fmt.Printf("no_content:    %v\n", p.NoContent)
-	fmt.Printf("silent:        %v\n", p.Silent)
+	fmt.Printf("  depth:         %d\n", p.Depth)
+	fmt.Printf("  includes:      %v\n", p.Includes)
+	fmt.Printf("  excludes:      %v\n", p.Excludes)
+	fmt.Printf("  pick_paths:    %v\n", p.PickPaths)
+	fmt.Printf("  force_text:    %v\n", p.ForceTextPatterns)
+	fmt.Printf("  force_binary:  %v\n", p.ForceBinaryPatterns)
+	fmt.Printf("  output:        %s\n", p.OutputPath)
+	fmt.Printf("  no_summary:    %v\n", p.NoSummary)
+	fmt.Printf("  no_index:      %v\n", p.NoIndex)
+	fmt.Printf("  no_git_log:    %v\n", p.NoGitLog)
+	fmt.Printf("  no_content:    %v\n", p.NoContent)
+	fmt.Printf("  silent:        %v\n", p.Silent)
 }
 
 // FromParams builds a Config from CLI params and the loaded .snpconfig file.
-func FromParams(p Params) (Config, error) {
-	return fromParams(p, !p.NoConfig)
+func FromParams(p Params, verbose bool) (Config, error) {
+	return fromParams(p, !p.NoConfig, verbose)
 }
 
 // FromParamsOnly builds a Config from CLI params only, without loading .snpconfig.
-func FromParamsOnly(p Params) Config {
-	cfg, _ := fromParams(p, false)
+func FromParamsOnly(p Params, verbose bool) Config {
+	cfg, _ := fromParams(p, false, verbose)
 	return cfg
 }
 
 // fromParams is the shared internal builder.
 // If load is true, it loads and merges the .snpconfig file from p.SourceDir.
-func fromParams(p Params, load bool) (Config, error) {
+// If verbose is true, prints file config and merged config after each stage.
+func fromParams(p Params, load bool, verbose bool) (Config, error) {
 	loaded := newConfig()
 	if load {
 		var err error
@@ -80,6 +81,11 @@ func fromParams(p Params, load bool) (Config, error) {
 		if err != nil {
 			return newConfig(), fmt.Errorf("loading config: %w", err)
 		}
+	}
+
+	if verbose {
+		loaded.Print("file config")
+		fmt.Println()
 	}
 
 	cfg := newConfig()
@@ -141,6 +147,11 @@ func fromParams(p Params, load bool) (Config, error) {
 	cfg.NoGitLog = p.NoGitLog || loaded.NoGitLog
 	cfg.NoContent = p.NoContent || loaded.NoContent
 	cfg.Silent = p.Silent || loaded.Silent
+
+	if verbose {
+		cfg.Print("merged config")
+		fmt.Println()
+	}
 
 	return cfg, nil
 }

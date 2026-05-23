@@ -8,8 +8,42 @@ import (
 	"github.com/neox5/snp/internal/filter"
 )
 
-// Print writes the config and equivalent CLI command to stdout.
-func (cfg Config) Print() {
+// Print writes a human-readable diagnostic representation of Config to stdout.
+// label identifies the stage, e.g. "file config" or "merged config".
+func (cfg Config) Print(label string) {
+	fmt.Println("[" + label + "]")
+	fmt.Printf("  generated:     %s\n", func() string {
+		if cfg.Generated.IsZero() {
+			return "-"
+		}
+		return cfg.Generated.Local().Format("2006-01-02 15:04:05")
+	}())
+	fmt.Printf("  source_dir:    %s\n", cfg.SourceDir)
+	fmt.Printf("  dry_run:       %v\n", cfg.DryRun)
+	fmt.Println()
+	fmt.Printf("  depth:         %d\n", cfg.Depth)
+	fmt.Printf("  filter_rules:  [%s]\n", func() string {
+		var parts []string
+		for _, r := range cfg.FilterRules {
+			if s, err := serializeRule(r); err == nil {
+				parts = append(parts, s)
+			}
+		}
+		return strings.Join(parts, " ")
+	}())
+	fmt.Printf("  pick_paths:    %v\n", cfg.PickPaths)
+	fmt.Printf("  force_text:    %v\n", cfg.ForceTextPatterns)
+	fmt.Printf("  force_binary:  %v\n", cfg.ForceBinaryPatterns)
+	fmt.Printf("  output:        %s\n", cfg.OutputPath)
+	fmt.Printf("  no_summary:    %v\n", cfg.NoSummary)
+	fmt.Printf("  no_index:      %v\n", cfg.NoIndex)
+	fmt.Printf("  no_git_log:    %v\n", cfg.NoGitLog)
+	fmt.Printf("  no_content:    %v\n", cfg.NoContent)
+	fmt.Printf("  silent:        %v\n", cfg.Silent)
+}
+
+// Serialize writes cfg in .snpconfig file format to stdout.
+func (cfg Config) Serialize() {
 	if !cfg.Generated.IsZero() {
 		fmt.Println("# generated: " + cfg.Generated.Local().Format("2006-01-02 15:04:05"))
 	}
