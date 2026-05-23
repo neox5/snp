@@ -22,7 +22,7 @@ func buildParamsFromCLI(c *cli.Command) config.Params {
 
 	return config.Params{
 		SourceDir:           sourceDir,
-		Args:                os.Args[1:],
+		Args:                os.Args[1:], // included for determine order of include/exclude flags
 		NoConfig:            c.Bool("no-config"),
 		SaveConfig:          c.Bool("save-config"),
 		PrintConfig:         c.Bool("print-config"),
@@ -55,6 +55,11 @@ func runAction(ctx context.Context, c *cli.Command) error {
 
 	p := buildParamsFromCLI(c)
 
+	if p.VerboseLevel >= 1 {
+		p.Print()
+		fmt.Println()
+	}
+
 	hasPick := len(p.PickPaths) > 0
 	hasTraversal := len(p.Includes) > 0 || len(p.Excludes) > 0 ||
 		c.Bool("include-all") || c.Bool("exclude-all") || c.Bool("exclude-defaults")
@@ -67,7 +72,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	}
 
 	if p.SaveConfig {
-		cfg := config.FromParamsCLI(p)
+		cfg := config.FromParamsOnly(p)
 		cfg.Generated = time.Now()
 		if err := cfg.Save(p.SourceDir); err != nil {
 			return err
@@ -93,6 +98,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	}
 
 	if !cfg.Silent {
+		fmt.Println("[command]")
 		fmt.Println(cfg.BuildCommand())
 	}
 

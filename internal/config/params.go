@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/neox5/snp/internal/filter"
@@ -33,13 +34,38 @@ type Params struct {
 	Silent              bool
 }
 
+// Print writes a human-readable representation of Params to stdout.
+func (p Params) Print() {
+	fmt.Println("[params]")
+	fmt.Printf("source_dir:    %s\n", p.SourceDir)
+	fmt.Printf("args:          [%s]\n", strings.Join(p.Args, " "))
+	fmt.Printf("no_config:     %v\n", p.NoConfig)
+	fmt.Printf("save_config:   %v\n", p.SaveConfig)
+	fmt.Printf("print_config:  %v\n", p.PrintConfig)
+	fmt.Printf("dry_run:       %v\n", p.DryRun)
+	fmt.Printf("verbose:       %d\n", p.VerboseLevel)
+	fmt.Println()
+	fmt.Printf("depth:         %d\n", p.Depth)
+	fmt.Printf("includes:      %v\n", p.Includes)
+	fmt.Printf("excludes:      %v\n", p.Excludes)
+	fmt.Printf("pick_paths:    %v\n", p.PickPaths)
+	fmt.Printf("force_text:    %v\n", p.ForceTextPatterns)
+	fmt.Printf("force_binary:  %v\n", p.ForceBinaryPatterns)
+	fmt.Printf("output:        %s\n", p.OutputPath)
+	fmt.Printf("no_summary:    %v\n", p.NoSummary)
+	fmt.Printf("no_index:      %v\n", p.NoIndex)
+	fmt.Printf("no_git_log:    %v\n", p.NoGitLog)
+	fmt.Printf("no_content:    %v\n", p.NoContent)
+	fmt.Printf("silent:        %v\n", p.Silent)
+}
+
 // FromParams builds a Config from CLI params and the loaded .snpconfig file.
 func FromParams(p Params) (Config, error) {
 	return fromParams(p, !p.NoConfig)
 }
 
-// FromParamsCLI builds a Config from CLI params only, without loading .snpconfig.
-func FromParamsCLI(p Params) Config {
+// FromParamsOnly builds a Config from CLI params only, without loading .snpconfig.
+func FromParamsOnly(p Params) Config {
 	cfg, _ := fromParams(p, false)
 	return cfg
 }
@@ -84,7 +110,8 @@ func fromParams(p Params, load bool) (Config, error) {
 		var rules []filter.Rule
 
 		if !hasBaselineCLI && !hasBaselineFile {
-			rules = append(rules,
+			rules = append(
+				rules,
 				filter.Rule{Type: filter.RuleIncludeAll},
 				filter.Rule{Type: filter.RuleExcludeDefaults},
 			)
@@ -124,10 +151,8 @@ var baselineFlags = []string{"--include-all", "--exclude-all", "--exclude-defaul
 
 func hasBaseline(args []string) bool {
 	for _, arg := range args {
-		for _, bf := range baselineFlags {
-			if arg == bf {
-				return true
-			}
+		if slices.Contains(baselineFlags, arg) {
+			return true
 		}
 	}
 	return false
