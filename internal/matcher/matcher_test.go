@@ -16,11 +16,21 @@ func TestShouldInclude_NilMatcher(t *testing.T) {
 func TestShouldInclude_OrderedRules(t *testing.T) {
 	tests := []struct {
 		name   string
-		rules  []matcher.Rule
+		rules  matcher.Rules
 		path   string
 		want   bool
 		reason string
 	}{
+		{
+			name: "exclude-all then include Go — only Go files",
+			rules: []matcher.Rule{
+				{Type: matcher.RuleExcludeAll},
+				{Type: matcher.RuleInclude, Pattern: "**/*.go"},
+			},
+			path:   "src/main.go",
+			want:   true,
+			reason: "include **/*.go wins after exclude-all",
+		},
 		{
 			name: "exclude-all then include Go — only Go files",
 			rules: []matcher.Rule{
@@ -75,10 +85,7 @@ func TestShouldInclude_OrderedRules(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := matcher.New(tt.rules)
-			if err != nil {
-				t.Fatalf("New failed: %v", err)
-			}
+			m := matcher.New(tt.rules)
 			got := m.ShouldInclude(tt.path)
 			if got != tt.want {
 				t.Errorf("ShouldInclude(%q) = %v, want %v\nReason: %s", tt.path, got, tt.want, tt.reason)

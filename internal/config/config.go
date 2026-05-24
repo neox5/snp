@@ -121,16 +121,16 @@ func (c Config) BuildMatcherRules() matcher.Rules {
 	for _, f := range c.MatcherFlags {
 		switch f.Type {
 		case FlagTypeExcludeAll:
-			r.AddExcludeAll()
+			r = r.AddExcludeAll()
 			continue
 		case FlagTypeIncludeAll:
-			r.AddIncludeAll()
+			r = r.AddIncludeAll()
 			continue
 		case FlagTypeExclude:
-			r.AddExclude(f.Value)
+			r = r.AddExclude(f.Value)
 			continue
 		case FlagTypeInclude:
-			r.AddInclude(f.Value)
+			r = r.AddInclude(f.Value)
 		}
 	}
 

@@ -3,69 +3,58 @@
 package matcher
 
 import (
+	"fmt"
 	"path"
 	"strings"
 )
 
-// compiled is an internal evaluated rule.
-type compiled struct {
-	patterns []string // empty means match-all (include-all / exclude-all)
-	exclude  bool
-}
-
 // Matcher holds an ordered list of compiled rules. Last match wins.
 type Matcher struct {
-	rules []compiled
+	rules Rules
 }
 
 // New builds a Matcher from an ordered list of rules.
-func New(rules []Rule) (*Matcher, error) {
-	var cr []compiled
-
-	for _, r := range rules {
-		switch r.Type {
-		case RuleIncludeAll:
-			cr = append(cr, compiled{patterns: nil, exclude: false})
-
-		case RuleExcludeAll:
-			cr = append(cr, compiled{patterns: nil, exclude: true})
-
-		case RuleInclude:
-			cr = append(cr, compiled{patterns: []string{r.Pattern}, exclude: false})
-
-		case RuleExclude:
-			cr = append(cr, compiled{patterns: []string{r.Pattern}, exclude: true})
-		}
-	}
-
-	return &Matcher{rules: cr}, nil
+func New(rs Rules) *Matcher {
+	return &Matcher{rules: rs}
 }
 
 // ShouldInclude returns true if relPath should be included.
 // Rules are evaluated in order; last match wins.
 // If no rule matches, the file is included by default.
 func (m *Matcher) ShouldInclude(relPath string) bool {
-	if m == nil {
-		return true
-	}
-
+	// default
 	result := true
 
 	for _, r := range m.rules {
-		if len(r.patterns) == 0 {
-			// include-all or exclude-all — matches everything
-			result = !r.exclude
-			continue
-		}
-
-		for _, pattern := range r.patterns {
-			matched, err := Match(pattern, relPath)
-			if err != nil || !matched {
+		if len(r.Pattern) == 0 {
+			if r.Type == RuleExcludeAll {
+				result = false
 				continue
 			}
-			result = !r.exclude
-			break
+			if r.Type == RuleIncludeAll {
+				result = true
+				continue
+			}
+			panic(fmt.Sprintf("empty pattern for type %s", r.Type))
 		}
+
+		matched, err := Match(r.Pattern, relPath)
+		if err != nil {
+			fmt.Printf("warn: error in match with pattern '%s' on path '%s': %v", r.Pattern, relPath, err)
+			continue
+		}
+		if !matched {
+			continue
+		}
+		if r.Type == RuleExclude {
+			result = false
+			continue
+		}
+		if r.Type == RuleInclude {
+			result = true
+			continue
+		}
+		panic(fmt.Sprintf("pattern '%s' set on type '%s'", r.Pattern, r.Type))
 	}
 
 	return result
@@ -104,7 +93,7 @@ func Match(pattern, relPath string) (bool, error) {
 
 	// Rule 2: no slash — match filename component only
 	if !strings.Contains(pattern, "/") {
-		return matchGlob(pattern, path.Base(relPath))
+		return path.Match(pattern, path.Base(relPath))
 	}
 
 	// Rules 3 & 4: slash present — anchored full path match
@@ -145,7 +134,7 @@ func matchSegments(pat, parts []string) (bool, error) {
 		if len(parts) == 0 {
 			return false, nil
 		}
-		ok, err := matchGlob(seg, parts[0])
+		ok, err := path.Match(seg, parts[0])
 		if err != nil {
 			return false, err
 		}
@@ -157,9 +146,4 @@ func matchSegments(pat, parts []string) (bool, error) {
 
 	// pattern exhausted — must have consumed all path parts
 	return len(parts) == 0, nil
-}
-
-// matchGlob matches a single non-separator pattern against a single name segment.
-func matchGlob(pattern, name string) (bool, error) {
-	return path.Match(pattern, name)
 }
