@@ -1,0 +1,97 @@
+package matcher_test
+
+import (
+	"testing"
+
+	"github.com/neox5/snp/internal/matcher"
+)
+
+func TestShouldInclude_NilMatcher(t *testing.T) {
+	var m *matcher.Matcher
+	if !m.ShouldInclude("any/path.go") {
+		t.Error("nil Matcher should include all paths")
+	}
+}
+
+func TestNew_InvalidDirectory(t *testing.T) {
+	_, err := matcher.New("/nonexistent/directory/12345", nil)
+	if err == nil {
+		t.Error("New should fail for nonexistent directory")
+	}
+}
+
+func TestShouldInclude_OrderedRules(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	tests := []struct {
+		name   string
+		rules  []matcher.Rule
+		path   string
+		want   bool
+		reason string
+	}{
+		{
+			name: "exclude-all then include Go — only Go files",
+			rules: []matcher.Rule{
+				{Type: matcher.RuleExcludeAll},
+				{Type: matcher.RuleInclude, Pattern: "**/*.go"},
+			},
+			path:   "src/main.go",
+			want:   true,
+			reason: "include **/*.go wins after exclude-all",
+		},
+		{
+			name: "exclude-all then include Go — non-Go excluded",
+			rules: []matcher.Rule{
+				{Type: matcher.RuleExcludeAll},
+				{Type: matcher.RuleInclude, Pattern: "**/*.go"},
+			},
+			path:   "README.md",
+			want:   false,
+			reason: "exclude-all wins, no include rule matches",
+		},
+		{
+			name: "last rule wins — rescue from exclude",
+			rules: []matcher.Rule{
+				{Type: matcher.RuleIncludeAll},
+				{Type: matcher.RuleExclude, Pattern: "**/*_test.go"},
+				{Type: matcher.RuleInclude, Pattern: "internal/auth/auth_test.go"},
+			},
+			path:   "internal/auth/auth_test.go",
+			want:   true,
+			reason: "last include rule rescues specific test file",
+		},
+		{
+			name: "last rule wins — exclude after include",
+			rules: []matcher.Rule{
+				{Type: matcher.RuleIncludeAll},
+				{Type: matcher.RuleExclude, Pattern: "**/*_test.go"},
+			},
+			path:   "internal/auth/auth_test.go",
+			want:   false,
+			reason: "exclude wins as last matching rule",
+		},
+		{
+			name: "include-all baseline — everything included",
+			rules: []matcher.Rule{
+				{Type: matcher.RuleIncludeAll},
+			},
+			path:   "node_modules/package.json",
+			want:   true,
+			reason: "include-all with no further rules includes everything",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m, err := matcher.New(tmpDir, tt.rules)
+			if err != nil {
+				t.Fatalf("New failed: %v", err)
+			}
+			got := m.ShouldInclude(tt.path)
+			if got != tt.want {
+				t.Errorf("ShouldInclude(%q) = %v, want %v\nReason: %s", tt.path, got, tt.want, tt.reason)
+			}
+		})
+	}
+}

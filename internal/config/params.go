@@ -34,7 +34,7 @@ func (p Params) ToConfig() *Config {
 		Generated:           time.Now(),
 		SourceDir:           p.SourceDir,
 		Depth:               p.Depth,
-		FilterFlags:         p.buildFilterFlags(),
+		MatcherFlags:        p.buildMatcherFlags(),
 		PickPaths:           p.PickPaths,
 		ForceTextPatterns:   p.ForceTextPatterns,
 		ForceBinaryPatterns: p.ForceBinaryPatterns,
@@ -71,7 +71,7 @@ func (p Params) Print() {
 	fmt.Printf("  silent:        %v\n", p.Silent)
 }
 
-func (p Params) buildFilterFlags() []Flag {
+func (p Params) buildMatcherFlags() []Flag {
 	f := []Flag{}
 
 	for i := 0; i < len(p.Args); i++ {

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/neox5/snp/internal/filter"
+	"github.com/neox5/snp/internal/matcher"
 )
 
 var DefaultExcludePatterns = []string{
@@ -43,7 +43,7 @@ func PrintDefaultExcludes() {
 	fmt.Println("  + .gitignore (if present)")
 }
 
-func buildExcludeDefaultRules(srcDir string) filter.Rules {
+func buildExcludeDefaultRules(srcDir string) matcher.Rules {
 	srcDirAbs, err := filepath.Abs(srcDir)
 	if err != nil {
 		return nil
@@ -51,7 +51,7 @@ func buildExcludeDefaultRules(srcDir string) filter.Rules {
 	path := filepath.Join(srcDirAbs, ".gitignore")
 	patterns := append(DefaultExcludePatterns, loadGitignorePatterns(path)...)
 
-	r := filter.NewRules()
+	r := matcher.NewRules()
 	for _, n := range patterns {
 		r = r.AddExclude(n)
 	}

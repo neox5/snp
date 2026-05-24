@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neox5/snp/internal/filter"
+	"github.com/neox5/snp/internal/matcher"
 )
 
 const (
@@ -62,7 +62,7 @@ type Config struct {
 	Generated           time.Time `json:"generated"`
 	SourceDir           string    `json:"source_dir"`
 	Depth               int       `json:"depth"`
-	FilterFlags         []Flag    `json:"filter_flags"`
+	MatcherFlags        []Flag    `json:"filter_flags"`
 	PickPaths           []string  `json:"pick_paths"`
 	ForceTextPatterns   []string  `json:"force_text_patterns"`
 	ForceBinaryPatterns []string  `json:"force_binary_patterns"`
@@ -91,7 +91,7 @@ func (c Config) Merge(other Config) *Config {
 		Generated:           other.Generated,
 		SourceDir:           other.SourceDir,
 		Depth:               depth,
-		FilterFlags:         append(c.FilterFlags, other.FilterFlags...),
+		MatcherFlags:        append(c.MatcherFlags, other.MatcherFlags...),
 		PickPaths:           mergeUnique(c.PickPaths, other.PickPaths),
 		ForceTextPatterns:   mergeUnique(c.ForceTextPatterns, other.ForceTextPatterns),
 		ForceBinaryPatterns: mergeUnique(c.ForceBinaryPatterns, other.ForceBinaryPatterns),
@@ -106,7 +106,7 @@ func (c Config) Merge(other Config) *Config {
 }
 
 func (c Config) Validate() error {
-	if len(c.FilterFlags) > 0 && len(c.PickPaths) > 0 {
+	if len(c.MatcherFlags) > 0 && len(c.PickPaths) > 0 {
 		return fmt.Errorf("--pick cannot be combined with --include/exclude(-all)")
 	}
 	if len(c.PickPaths) > 0 && c.Depth > -1 {
@@ -115,10 +115,10 @@ func (c Config) Validate() error {
 	return nil
 }
 
-func (c Config) buildFilterRules() filter.Rules {
+func (c Config) buildFilterRules() matcher.Rules {
 	r := buildExcludeDefaultRules(c.SourceDir) // apply default excludes first
 
-	for _, f := range c.FilterFlags {
+	for _, f := range c.MatcherFlags {
 		switch f.Type {
 		case FlagTypeExcludeAll:
 			r.AddExcludeAll()
