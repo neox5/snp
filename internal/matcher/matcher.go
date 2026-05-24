@@ -3,10 +3,7 @@
 package matcher
 
 import (
-	"fmt"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -22,21 +19,7 @@ type Matcher struct {
 }
 
 // New builds a Matcher from an ordered list of rules.
-// sourceDir is used to load .gitignore for RuleExcludeDefaults.
-func New(sourceDir string, rules []Rule) (*Matcher, error) {
-	absSourceDir, err := filepath.Abs(sourceDir)
-	if err != nil {
-		return nil, err
-	}
-
-	info, err := os.Stat(absSourceDir)
-	if err != nil {
-		return nil, err
-	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("%q is not a directory", absSourceDir)
-	}
-
+func New(rules []Rule) (*Matcher, error) {
 	var cr []compiled
 
 	for _, r := range rules {

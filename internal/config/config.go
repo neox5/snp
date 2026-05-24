@@ -115,7 +115,7 @@ func (c Config) Validate() error {
 	return nil
 }
 
-func (c Config) buildFilterRules() matcher.Rules {
+func (c Config) BuildMatcherRules() matcher.Rules {
 	r := buildExcludeDefaultRules(c.SourceDir) // apply default excludes first
 
 	for _, f := range c.MatcherFlags {

@@ -13,16 +13,7 @@ func TestShouldInclude_NilMatcher(t *testing.T) {
 	}
 }
 
-func TestNew_InvalidDirectory(t *testing.T) {
-	_, err := matcher.New("/nonexistent/directory/12345", nil)
-	if err == nil {
-		t.Error("New should fail for nonexistent directory")
-	}
-}
-
 func TestShouldInclude_OrderedRules(t *testing.T) {
-	tmpDir := t.TempDir()
-
 	tests := []struct {
 		name   string
 		rules  []matcher.Rule
@@ -84,7 +75,7 @@ func TestShouldInclude_OrderedRules(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := matcher.New(tmpDir, tt.rules)
+			m, err := matcher.New(tt.rules)
 			if err != nil {
 				t.Fatalf("New failed: %v", err)
 			}
