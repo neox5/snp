@@ -3,4 +3,5 @@ dist
 
 # snapshot files & config
 **/*.snp
-.snpconfig
+**/*.snp.txt
+.snpconfig.json

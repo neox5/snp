@@ -19,7 +19,7 @@ func (c Config) Print() {
 	fmt.Printf("  dry_run:       %v\n", c.DryRun)
 	fmt.Println()
 	fmt.Printf("  depth:         %d\n", c.Depth)
-	fmt.Printf("  filter_flags:  %v\n", c.FilterFlags)
+	fmt.Printf("  matcher_flags: %v\n", c.MatcherFlags)
 	fmt.Printf("  pick_paths:    %v\n", c.PickPaths)
 	fmt.Printf("  force_text:    %v\n", c.ForceTextPatterns)
 	fmt.Printf("  force_binary:  %v\n", c.ForceBinaryPatterns)
@@ -36,7 +36,7 @@ func (c Config) BuildCommand() string {
 	var parts []string
 	parts = append(parts, "snp")
 
-	for _, f := range c.FilterFlags {
+	for _, f := range c.MatcherFlags {
 		switch f.Type {
 		case FlagTypeIncludeAll:
 			parts = append(parts, "--include-all")
