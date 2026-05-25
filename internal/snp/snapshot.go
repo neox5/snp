@@ -1,6 +1,7 @@
 package snp
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -120,8 +121,9 @@ func (s *Snapshot) Write() error {
 
 // WriteTo writes the snapshot layout to the given writer.
 func (s *Snapshot) WriteTo(w io.Writer) (int64, error) {
+	bw := bufio.NewWriter(w)
 	for _, c := range s.Layout {
-		if _, err := c.WriteTo(w); err != nil {
+		if _, err := c.WriteTo(bw); err != nil {
 			return 0, err
 		}
 	}
