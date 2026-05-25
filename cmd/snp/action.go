@@ -87,8 +87,9 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		cfg.BuildMatcherRules().Print("  ")
 	}
 
-	snap, err := snp.New(cfg)
-	if err != nil {
+	snap := snp.New(cfg)
+
+	if err = snap.Collect(ctx); err != nil {
 		return err
 	}
 
@@ -97,6 +98,11 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		snap.PrintRawEntries()
 		return nil
 	}
+
+	printHeader(false, "Git Log")
+	snap.GitData.Print()
+
+	// Process
 
 	return nil
 }

@@ -97,27 +97,27 @@ func newDivider() Content {
 
 // ===== Content Types =====
 
-// gitLog represents git log lines
-type gitLog struct {
-	Lines GitLogLines
-}
+// // gitLog represents git log lines
+// type gitLog struct {
+// 	Lines GitLogLines
+// }
 
-func (g gitLog) LineCount() int {
-	return len(g.Lines)
-}
+// func (g gitLog) LineCount() int {
+// 	return len(g.Lines)
+// }
 
-func (g gitLog) WriteTo(lt *writer.LineTracker) error {
-	for _, line := range g.Lines {
-		if err := lt.WriteLine(line); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+// func (g gitLog) WriteTo(lt *writer.LineTracker) error {
+// 	for _, line := range g.Lines {
+// 		if err := lt.WriteLine(line); err != nil {
+// 			return err
+// 		}
+// 	}
+// 	return nil
+// }
 
-func newGitLog(lines GitLogLines) Content {
-	return gitLog{Lines: lines}
-}
+// func newGitLog(lines GitLogLines) Content {
+// 	return gitLog{Lines: lines}
+// }
 
 // index renders all file index entries and collapsed dir entries
 type index struct {

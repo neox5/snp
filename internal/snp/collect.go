@@ -10,24 +10,10 @@ import (
 	"github.com/neox5/snp/internal/matcher"
 )
 
-// Snapshot represents the complete snapshot data.
-type Snapshot struct {
-	GitLogLines GitLogLines
-	Entries     []*Entry
-	Layout      []Content
-}
-
-// GitLogLines represents git log output.
-type GitLogLines []string
-
-func New(c *config.Config) (*Snapshot, error) {
-	snap := &Snapshot{}
+func collect(c *config.Config, root string) ([]*Entry, error) {
 	entries := []*Entry{}
 
-	srcDir := filepath.ToSlash(c.SourceDir) // path normalization (unix slashes)
-	srcDir = filepath.Clean(srcDir)         // produce the shortest possible path
-	root := strings.TrimRight(srcDir, "/")  // remove trailing slash for accurate rootDepth
-	rootDepth := strings.Count(root, "/")   // count the leftover slashes to determine depth
+	rootDepth := strings.Count(root, "/") // count the leftover slashes to determine depth
 
 	// pathDepth for calculating the current depth of a path
 	pathDepth := func(p string) int {
@@ -82,11 +68,10 @@ func New(c *config.Config) (*Snapshot, error) {
 		entries = append(entries, NewFile(path))
 		return nil
 	})
+	// check for WalkDir errors
 	if err != nil {
 		return nil, err
 	}
 
-	snap.Entries = entries
-
-	return snap, nil
+	return entries, nil
 }

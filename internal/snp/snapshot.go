@@ -1,135 +1,46 @@
 package snp
 
 import (
-	"fmt"
-	"io"
+	"context"
+	"path/filepath"
+	"strings"
 
-	"github.com/neox5/snp/internal/writer"
+	"github.com/neox5/snp/internal/config"
 )
 
-// // Build creates a complete snapshot.
-// func Build(ctx context.Context, cfg config.Config, absSourceDir string, absOutput string) (*Snapshot, error) {
-// 	snap := &Snapshot{}
+// Snapshot represents the complete snapshot data.
+type Snapshot struct {
+	Config  *config.Config
+	Root    string
+	GitData *GitData
+	Entries []*Entry
+	Layout  []Content
+}
 
-// 	var files []*file.File
-// 	var collapsedDirs []file.DirEntry
-// 	var textFiles, binaryFiles int
-// 	var err error
+func New(c *config.Config) *Snapshot {
+	srcDir := filepath.ToSlash(c.SourceDir) // path normalization (unix slashes)
+	srcDir = filepath.Clean(srcDir)         // produce the shortest possible path
+	root := strings.TrimRight(srcDir, "/")  // remove trailing slash for accurate rootDepth
 
-// 	if cfg.IsPick() {
-// 		files, textFiles, binaryFiles, err = pick.Collect(
-// 			absSourceDir,
-// 			cfg.PickPaths,
-// 			cfg.ForceTextPatterns,
-// 			cfg.ForceBinaryPatterns,
-// 		)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	} else {
-// 		if !cfg.NoGitLog && gitlog.HasRepo(absSourceDir) {
-// 			gitLogData, err := gitlog.Collect(ctx, absSourceDir)
-// 			if err != nil {
-// 				return nil, fmt.Errorf("failed to collect git log: %w", err)
-// 			}
-// 			snap.GitLogLines = gitLogData.Lines
-// 		}
+	return &Snapshot{Config: c, Root: root}
+}
 
-// 		files, collapsedDirs, textFiles, binaryFiles, err = file.Collect(
-// 			absSourceDir,
-// 			absOutput,
-// 			cfg.FilterRules,
-// 			cfg.ForceTextPatterns,
-// 			cfg.ForceBinaryPatterns,
-// 			cfg.Depth,
-// 		)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-
-// 	snap.Files = files
-// 	snap.CollapsedDirs = collapsedDirs
-
-// 	var totalSize int64
-// 	for _, f := range files {
-// 		totalSize += f.Size
-// 	}
-// 	for _, d := range collapsedDirs {
-// 		totalSize += d.Size
-// 	}
-
-// 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-// 	totalFiles := len(files)
-// 	totalLines := 0
-
-// 	var layout []Content
-// 	needsDivider := false
-
-// 	section := func(contents ...Content) {
-// 		if needsDivider {
-// 			layout = append(layout, newDivider())
-// 		}
-// 		layout = append(layout, contents...)
-// 		needsDivider = true
-// 	}
-
-// 	if !cfg.NoSummary {
-// 		section(
-// 			newSummary(timestamp, totalFiles, textFiles, binaryFiles, totalSize, &totalLines),
-// 		)
-// 	}
-
-// 	if !cfg.NoIndex {
-// 		section(
-// 			newHeader("File Index"),
-// 			newIndex(snap.Files, snap.CollapsedDirs),
-// 		)
-// 	}
-
-// 	if !cfg.NoGitLog && len(snap.GitLogLines) > 0 {
-// 		section(
-// 			newHeader("Git Log (git adog)"),
-// 			newGitLog(snap.GitLogLines),
-// 		)
-// 	}
-
-// 	if !cfg.NoContent {
-// 		for _, f := range snap.Files {
-// 			section(
-// 				newHeader(f.RelPath),
-// 				newFileContent(f),
-// 			)
-// 		}
-// 	}
-
-// 	currentLine := 1
-// 	for _, content := range layout {
-// 		if fc, ok := content.(fileContent); ok {
-// 			fc.File.StartLine = currentLine
-// 		}
-// 		currentLine += content.LineCount()
-// 	}
-
-// 	totalLines = currentLine - 1
-// 	snap.Layout = layout
-
-// 	return snap, nil
-// }
-
-// WriteTo writes the snapshot to the writer.
-func (s *Snapshot) WriteTo(w io.Writer) (int64, error) {
-	if s.Layout == nil {
-		return 0, fmt.Errorf("layout not initialized")
-	}
-
-	lt := writer.NewLineTracker(w)
-
-	for _, content := range s.Layout {
-		if err := content.WriteTo(lt); err != nil {
-			return 0, err
+func (s *Snapshot) Collect(ctc context.Context) error {
+	// ### git
+	if isGitRepo(s.Root) {
+		data, err := collectGitData(ctc, s.Root)
+		if err != nil {
+			return err
 		}
+		s.GitData = data
 	}
 
-	return 0, lt.Flush()
+	// ### entries
+	entries, err := collect(s.Config, s.Root)
+	if err != nil {
+		return err
+	}
+	s.Entries = entries
+
+	return nil
 }
