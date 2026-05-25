@@ -106,10 +106,20 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return nil
 	}
 
-	printHeader(false, "Git Log")
-	snap.GitData.Print()
+	start := time.Now()
 
-	// ### snapshot processing
+	// ### build Snapshot
+	if err = snap.Build(); err != nil {
+		return err
+	}
+
+	if err = snap.Write(); err != nil {
+		return err
+	}
+
+	if !cfg.Silent {
+		fmt.Printf("Snapshot written: %s (%s)\n", cfg.OutputPath, formatDuration(time.Since(start)))
+	}
 
 	return nil
 }
@@ -121,50 +131,3 @@ func formatDuration(d time.Duration) string {
 	}
 	return fmt.Sprintf("%.1fs", d.Seconds())
 }
-
-// 	absSourceDir, absOutput, err := snapshot.ValidateAndResolve(cfg)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	start := time.Now()
-
-// 	snap, err := snapshot.Build(ctx, cfg, absSourceDir, absOutput)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if cfg.DryRun {
-// 		if !cfg.Silent {
-// 			fmt.Println()
-// 			fmt.Println("[Dry-Run]")
-// 			for _, f := range snap.Files {
-// 				if f.IsBinary {
-// 					fmt.Printf("%s (binary, %s)\n", f.RelPath, file.FormatSize(f.Size))
-// 				} else {
-// 					fmt.Printf("%s (%d lines, %s)\n", f.RelPath, len(f.Lines), file.FormatSize(f.Size))
-// 				}
-// 			}
-// 			for _, d := range snap.CollapsedDirs {
-// 				fmt.Printf("%s (%d items, %s)\n", d.RelPath, d.ItemCount, file.FormatSize(d.Size))
-// 			}
-// 		}
-// 		return nil
-// 	}
-
-// 	outFile, err := os.Create(absOutput)
-// 	if err != nil {
-// 		return fmt.Errorf("cannot create output file %q: %w", absOutput, err)
-// 	}
-// 	defer outFile.Close()
-
-// 	if _, err := snap.WriteTo(outFile); err != nil {
-// 		return err
-// 	}
-
-// 	if !cfg.Silent {
-// 		fmt.Printf("Snapshot created: %s (%s)\n", absOutput, formatDuration(time.Since(start)))
-// 	}
-
-// 	return nil
-// }

@@ -5,29 +5,43 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 )
 
-// GitData represents collected git log information
+// GitData holds git log output and implements Content.
 type GitData struct {
 	LogLines []string
 }
 
-func (d GitData) Print() {
+// LineCount implements Content.
+func (d *GitData) LineCount() int { return len(d.LogLines) }
+
+// WriteTo implements Content.
+func (d *GitData) WriteTo(w io.Writer) (int, error) {
+	for _, line := range d.LogLines {
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return 0, err
+		}
+	}
+	return 0, nil
+}
+
+func (d *GitData) Print() {
 	for _, l := range d.LogLines {
 		fmt.Println(l)
 	}
 }
 
-// isGitRepo reports whether a .git directory exists under root
+// isGitRepo reports whether a .git directory exists under root.
 func isGitRepo(root string) bool {
 	info, err := os.Stat(filepath.Join(root, ".git"))
 	return err == nil && info.IsDir()
 }
 
-// collectGitlog retrieves git log output as lines
+// collectGitData retrieves git log output as lines.
 func collectGitData(ctx context.Context, root string) (*GitData, error) {
 	var buf bytes.Buffer
 	cmd := exec.CommandContext(ctx, "git", "-C", root, "log", "--all", "--decorate", "--oneline", "--graph")
@@ -43,7 +57,6 @@ func collectGitData(ctx context.Context, root string) (*GitData, error) {
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
-
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}

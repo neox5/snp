@@ -1,115 +1,83 @@
 package snp
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/neox5/snp/internal/matcher"
 )
 
 // Entry represents an entry in the snapshot.
-// depending on IsDir it represents a directory or a file.
+// Depending on IsDir it represents a directory or a file.
 type Entry struct {
 	IsDir bool
 
 	// common
-	Path string
-	Size int64 // number of bytes
+	Path    string
+	RelPath string
+	Size    int64
 
 	// file specific
-	IsBinary  bool // decides if it has a line or metadata representation
+	IsBinary  bool
 	Lines     []string
-	StartLine int // startline in the snapshot
+	StartLine int
+	EndLine   int
 
 	// dir specific
-	ItemCount int // the number of direct children in the directory
+	ItemCount int
 }
 
-func NewDir(path string) *Entry {
-	return &Entry{
-		IsDir: true,
-		Path:  path,
-	}
+func NewDir(path, relPath string) *Entry {
+	return &Entry{IsDir: true, Path: path, RelPath: relPath}
 }
 
-func NewFile(path string) *Entry {
-	return &Entry{
-		IsDir: false,
-		Path:  path,
+func NewFile(path, relPath string) *Entry {
+	return &Entry{IsDir: false, Path: path, RelPath: relPath}
+}
+
+// LineCount implements Content.
+func (e *Entry) LineCount() int { return len(e.Lines) }
+
+// WriteTo implements Content.
+func (e *Entry) WriteTo(w io.Writer) (int, error) {
+	for _, line := range e.Lines {
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return 0, err
+		}
 	}
+	return 0, nil
 }
 
 // checkForceOverride checks force-text and force-binary patterns.
 // Returns (isBinary, overridden).
 // Precedence: force-binary always wins (safe side).
-func checkForceOverride(relPath string, forceBinaryPatterns, forceTextPatterns []string) (isBinary bool, overridden bool) {
-	relUnix := filepath.ToSlash(relPath)
-
-	// Check force-binary first (highest precedence)
-	for _, pattern := range forceBinaryPatterns {
-		matched, err := matcher.Match(pattern, relUnix, false)
-		if err == nil && matched {
+func checkForceOverride(path string, forceBinary, forceText []string) (isBinary bool, overridden bool) {
+	for _, pattern := range forceBinary {
+		if ok, _ := matcher.Match(pattern, path, false); ok {
 			return true, true
 		}
 	}
-
-	// Check force-text (lower precedence)
-	for _, pattern := range forceTextPatterns {
-		matched, err := matcher.Match(pattern, relUnix, false)
-		if err == nil && matched {
+	for _, pattern := range forceText {
+		if ok, _ := matcher.Match(pattern, path, false); ok {
 			return false, true
 		}
 	}
-
 	return false, false
 }
 
-// detectBinary checks if a file is binary
+// detectBinary reports whether a file is binary by sniffing its content.
 func detectBinary(f *os.File) (bool, error) {
-	stat, err := f.Stat()
-	if err != nil {
-		return false, err
-	}
-	size := stat.Size()
-
-	if size == 0 {
-		return true, nil
-	}
-
-	// Reset read position to start
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return false, err
-	}
-
 	buf := make([]byte, 512)
-	n, readErr := f.Read(buf)
-	if readErr != nil && readErr != io.EOF {
-		return false, readErr
+	n, err := f.Read(buf)
+	if err != nil && n == 0 {
+		return false, err
 	}
-
-	contentType := http.DetectContentType(buf[:n])
-
-	if strings.HasPrefix(contentType, "text/") {
-		return false, nil
+	if _, err := f.Seek(0, 0); err != nil {
+		return false, err
 	}
-
-	textAppTypes := map[string]bool{
-		"application/json":       true,
-		"application/xml":        true,
-		"application/javascript": true,
-	}
-	if textAppTypes[contentType] {
-		return false, nil
-	}
-
-	for i := range n {
-		if buf[i] == 0 {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	ct := http.DetectContentType(buf[:n])
+	return !strings.HasPrefix(ct, "text/"), nil
 }

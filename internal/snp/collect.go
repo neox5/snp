@@ -13,13 +13,10 @@ import (
 func collect(c *config.Config, root string) ([]*Entry, error) {
 	entries := []*Entry{}
 
-	rootDepth := strings.Count(root, "/") // count the leftover slashes to determine depth
+	rootDepth := strings.Count(root, "/")
 
-	// pathDepth for calculating the current depth of a path
 	pathDepth := func(p string) int {
-		d := strings.Count(p, "/") - rootDepth
-		// fmt.Printf("[r/p]: %d/%d - %s\n", rootDepth, d, p)
-		return d
+		return strings.Count(p, "/") - rootDepth
 	}
 
 	m := matcher.New(c.BuildMatcherRules())
@@ -32,7 +29,6 @@ func collect(c *config.Config, root string) ([]*Entry, error) {
 			return wErr
 		}
 
-		// skip root
 		if path == root {
 			return nil
 		}
@@ -43,7 +39,6 @@ func collect(c *config.Config, root string) ([]*Entry, error) {
 		}
 		relPath = filepath.ToSlash(relPath)
 
-		// ### filter with matcher
 		if !m.ShouldInclude(relPath, d.IsDir()) {
 			if d.IsDir() {
 				return filepath.SkipDir
@@ -53,22 +48,17 @@ func collect(c *config.Config, root string) ([]*Entry, error) {
 
 		depth := pathDepth(path)
 
-		// ### directories
 		if d.IsDir() {
-			// collapsed directory case:
-			// when a directory is at the end of depth, it gets added to the entires
 			if c.Depth >= 0 && depth >= c.Depth {
-				entries = append(entries, NewDir(path))
-				return filepath.SkipDir // stop from traversing further down
+				entries = append(entries, NewDir(path, relPath))
+				return filepath.SkipDir
 			}
-			return nil // proceed with containing items
+			return nil
 		}
 
-		// ### files
-		entries = append(entries, NewFile(path))
+		entries = append(entries, NewFile(path, relPath))
 		return nil
 	})
-	// check for WalkDir errors
 	if err != nil {
 		return nil, err
 	}
