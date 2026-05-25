@@ -2,6 +2,7 @@ package snp
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -61,6 +62,16 @@ func (s *Snapshot) Process() error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (s *Snapshot) Write() error {
+	f, err := os.Create(s.Config.OutputPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
 	return nil
 }

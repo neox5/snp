@@ -7,6 +7,7 @@ import (
 
 	cli "github.com/urfave/cli/v3"
 
+	"github.com/neox5/snp/internal/config"
 	"github.com/neox5/snp/internal/version"
 )
 
@@ -92,9 +93,11 @@ Examples:
 			},
 			// Output control
 			&cli.StringFlag{
-				Name:    "output",
-				Aliases: []string{"o"},
-				Usage:   "Output file path",
+				Name:        "output",
+				Aliases:     []string{"o"},
+				Usage:       "Output file path",
+				DefaultText: config.DefaultOutputPath,
+				Value:       config.DefaultOutputPath,
 			},
 			&cli.BoolFlag{
 				Name:    "dry-run",
