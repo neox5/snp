@@ -2,7 +2,6 @@ package snp
 
 import (
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -41,37 +40,6 @@ func NewFile(path string) *Entry {
 		IsDir: false,
 		Path:  path,
 	}
-}
-
-type DirInfo struct {
-	ItemCount int
-	TotalSize int64
-}
-
-func dirInfo(path string) (DirInfo, error) {
-	var info DirInfo
-
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return info, err
-	}
-	info.ItemCount = len(entries)
-
-	err = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			fileInfo, err := d.Info()
-			if err != nil {
-				return err
-			}
-			info.TotalSize += fileInfo.Size()
-		}
-		return nil
-	})
-
-	return info, err
 }
 
 // checkForceOverride checks force-text and force-binary patterns.
