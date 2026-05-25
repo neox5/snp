@@ -17,6 +17,7 @@ type Snapshot struct {
 	Layout  []Content
 }
 
+// New creates a snapshot instance and sets config and root directory.
 func New(c *config.Config) *Snapshot {
 	srcDir := filepath.ToSlash(c.SourceDir) // path normalization (unix slashes)
 	srcDir = filepath.Clean(srcDir)         // produce the shortest possible path
@@ -25,10 +26,11 @@ func New(c *config.Config) *Snapshot {
 	return &Snapshot{Config: c, Root: root}
 }
 
-func (s *Snapshot) Collect(ctc context.Context) error {
+// Collect collects git data (if present) and all snapshot entries (files + dirs).
+func (s *Snapshot) Collect(ctx context.Context) error {
 	// ### git
 	if isGitRepo(s.Root) {
-		data, err := collectGitData(ctc, s.Root)
+		data, err := collectGitData(ctx, s.Root)
 		if err != nil {
 			return err
 		}
@@ -41,6 +43,24 @@ func (s *Snapshot) Collect(ctc context.Context) error {
 		return err
 	}
 	s.Entries = entries
+
+	return nil
+}
+
+// Process process all entry contents
+func (s *Snapshot) Process() error {
+	for _, e := range s.Entries {
+		if e.IsDir {
+			if err := s.processDir(e); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := s.processFile(e); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

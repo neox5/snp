@@ -45,6 +45,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return nil
 	}
 
+	// ### process cli parameters and convert to config
 	p := cliToParams(c)
 	cfg, err := config.LoadConfig(p)
 	if err != nil {
@@ -55,6 +56,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return err
 	}
 
+	// ### save configuration feature
 	if p.SaveConfig {
 		if err = cfg.Save(p.SourceDir); err != nil {
 			return err
@@ -64,6 +66,9 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		}
 		return nil
 	}
+
+	// printHeader is used to give a uniform way of printing a header block.
+	// it also adds a separation line if first != true
 	printHeader := func(first bool, h string) {
 		if !first {
 			fmt.Println()
@@ -71,6 +76,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		fmt.Printf("[%s]\n", h)
 	}
 
+	// ### print configuration feature
 	if p.PrintConfig {
 		printHeader(true, "snp config")
 		cfg.Print()
@@ -93,6 +99,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return err
 	}
 
+	// ### dry run feature
 	if p.DryRun {
 		printHeader(false, "Dry Run")
 		snap.PrintRawEntries()
@@ -102,7 +109,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	printHeader(false, "Git Log")
 	snap.GitData.Print()
 
-	// Process
+	// ### snapshot processing
 
 	return nil
 }
