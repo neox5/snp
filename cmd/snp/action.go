@@ -9,6 +9,7 @@ import (
 	cli "github.com/urfave/cli/v3"
 
 	"github.com/neox5/snp/internal/config"
+	"github.com/neox5/snp/internal/snp"
 )
 
 func cliToParams(c *cli.Command) config.Params {
@@ -72,15 +73,15 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	if !cfg.Silent {
 		fmt.Println("[command]")
 		fmt.Println(cfg.BuildCommand())
-		fmt.Println()
 	}
 
 	if p.VerboseLevel >= 2 {
+		fmt.Println()
 		fmt.Println("[Matcher Rules]")
 		cfg.BuildMatcherRules().Print("  ")
-		fmt.Println()
 	}
-	// snp.Collect(cfg)
+
+	snp.Collect(cfg)
 
 	return nil
 }

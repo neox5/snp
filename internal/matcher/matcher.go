@@ -5,6 +5,7 @@ package matcher
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -21,7 +22,11 @@ func New(rs Rules) *Matcher {
 // ShouldInclude returns true if relPath should be included.
 // Rules are evaluated in order; last match wins.
 // If no rule matches, the file is included by default.
-func (m *Matcher) ShouldInclude(relPath string) bool {
+func (m *Matcher) ShouldInclude(relPath string, isDir bool) bool {
+	if m == nil {
+		return true
+	}
+
 	// default
 	result := true
 
@@ -38,7 +43,7 @@ func (m *Matcher) ShouldInclude(relPath string) bool {
 			panic(fmt.Sprintf("empty pattern for type %s", r.Type))
 		}
 
-		matched, err := Match(r.Pattern, relPath)
+		matched, err := Match(r.Pattern, relPath, isDir)
 		if err != nil {
 			fmt.Printf("warn: error in match with pattern '%s' on path '%s': %v", r.Pattern, relPath, err)
 			continue
@@ -61,43 +66,46 @@ func (m *Matcher) ShouldInclude(relPath string) bool {
 }
 
 // Match reports whether relPath matches the given gitignore-style pattern.
+// The matching considers whether the path is a directory (isDir) for patterns
+// ending with a trailing slash.
 //
 // Pattern rules:
 //
 //  1. Trailing slash (e.g. "node_modules/"):
-//     matches any file whose path starts with the directory prefix.
-//     "node_modules/" matches "node_modules/pkg/foo.js" but NOT "node_modules".
+//     Matches the directory itself (only if isDir=true) and all paths under it.
+//     "node_modules/" matches "node_modules" (if isDir) and "node_modules/pkg/foo.js".
 //
 //  2. No slash (e.g. "*.test.js", "README.md"):
-//     matched against the filename component only (last path segment),
-//     at any depth.
+//     Matches the last path segment (filename) at any depth.
+//     "*.test.js" matches "src/tests/kernel.test.js" and "kernel.test.js".
 //
 //  3. Leading slash (e.g. "/README.md"):
-//     anchored to root — matched against full relPath only.
+//     Anchored to the start of relPath. Matches only the exact path.
+//     "/README.md" matches "README.md" but not "docs/README.md".
 //
 //  4. Slash in middle (e.g. "src/*.go", "a/**/b"):
-//     matched against full relPath, anchored to root.
-//     ** as a path segment matches zero or more directory segments.
+//     Anchored to the start of relPath. Matches paths starting with the pattern.
+//     "src/*.go" matches "src/main.go" but not "pkg/src/main.go".
 //
 // Glob characters per segment: * ? [abc] [a-z]
 // Returns an error only if the pattern is malformed.
-func Match(pattern, relPath string) (bool, error) {
+func Match(pattern, relPath string, isDir bool) (bool, error) {
 	if pattern == "" || relPath == "" {
 		return false, nil
 	}
 
-	// Rule 1: trailing slash — directory prefix match (files only)
+	// Rule 1: trailing slash — match directory and its contents
 	if prefix, ok := strings.CutSuffix(pattern, "/"); ok {
-		return strings.HasPrefix(relPath, prefix+"/"), nil
+		return isDir && relPath == prefix ||
+			strings.HasPrefix(relPath, prefix+"/"), nil
 	}
 
 	// Rule 2: no slash — match filename component only
 	if !strings.Contains(pattern, "/") {
-		return path.Match(pattern, path.Base(relPath))
+		return path.Match(pattern, filepath.Base(relPath))
 	}
 
 	// Rules 3 & 4: slash present — anchored full path match
-	// strip optional leading slash (anchoring is always implicit)
 	pattern = strings.TrimPrefix(pattern, "/")
 	return matchSegments(
 		strings.Split(pattern, "/"),

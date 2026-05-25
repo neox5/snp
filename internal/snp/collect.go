@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -26,46 +27,94 @@ func Collect(c *config.Config) ([]Entry, error) {
 
 	m := matcher.New(c.BuildMatcherRules())
 
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, wErr error) error {
-		if wErr != nil {
-			if errors.Is(wErr, fs.ErrPermission) { // permission errors will be ingnored
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, fs.ErrPermission) {
 				return nil
 			}
-			return wErr
+			return err
 		}
 
-		path = filepath.ToSlash(path) // path normalization (unix slashes)
-		depth := pathDepth(path)
-
-		if !m.ShouldInclude(path) {
+		if path == root {
 			return nil
 		}
 
-		fmt.Printf("[%02d] %s\n", depth, path)
+		relPath, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relPath = filepath.ToSlash(relPath)
 
-		// // ### directories
-		// if d.IsDir() {
-		// 	if path == root { // skip root folder
-		// 		return nil
-		// 	}
+		if !m.ShouldInclude(relPath, d.IsDir()) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 
-		// 	if depth >= c.Depth {
-		// 		info, _ := d.Info()
-		// 		fmt.Printf("%s %d %v %v %v\n", info.Name(), info.Size(), info.Mode(), info.ModTime(), info.IsDir())
+		depth := pathDepth(relPath)
 
-		// 		return filepath.SkipDir
-		// 	}
-		// 	return nil
-		// }
+		// ### directories
+		if d.IsDir() {
+			if depth >= c.Depth {
+				info, err := dirInfo(path) // using the original path from WalkDir
+				if err != nil {
+					return err
+				}
+				fmt.Printf("[%d] %s (%d items, %s)\n", depth, relPath, info.ItemCount, formatBytes(info.TotalSize))
+				return filepath.SkipDir
+			}
+			return nil // proceed with containing items
+		}
 
-		// // ### files
-
+		// ### files
+		fmt.Printf("[%d] %s\n", depth, relPath)
 		return nil
 	})
 
 	return entries, err
 }
 
-func pathDepth(path string) int {
-	return strings.Count(path, "/") + 1
+type DirInfo struct {
+	ItemCount int
+	TotalSize int64
+}
+
+func dirInfo(path string) (DirInfo, error) {
+	var info DirInfo
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return info, err
+	}
+	info.ItemCount = len(entries)
+
+	err = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			fileInfo, err := d.Info()
+			if err != nil {
+				return err
+			}
+			info.TotalSize += fileInfo.Size()
+		}
+		return nil
+	})
+
+	return info, err
+}
+
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
