@@ -126,16 +126,16 @@ func (s *Snapshot) Write() error {
 	}
 	defer f.Close()
 
-	_, err = s.WriteTo(f)
-
-	return err
+	bw := bufio.NewWriter(f)
+	if _, err = s.WriteTo(bw); err != nil {
+		return err
+	}
+	return bw.Flush()
 }
 
-// WriteTo writes the snapshot layout to the given writer.
 func (s *Snapshot) WriteTo(w io.Writer) (int64, error) {
-	bw := bufio.NewWriter(w)
 	for _, c := range s.Layout {
-		if _, err := c.WriteTo(bw); err != nil {
+		if _, err := c.WriteTo(w); err != nil {
 			return 0, err
 		}
 	}
