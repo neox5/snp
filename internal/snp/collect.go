@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -12,7 +11,18 @@ import (
 	"github.com/neox5/snp/internal/matcher"
 )
 
-func Collect(c *config.Config) ([]*Entry, error) {
+// Snapshot represents the complete snapshot data.
+type Snapshot struct {
+	GitLogLines GitLogLines
+	Entries     []*Entry
+	Layout      []Content
+}
+
+// GitLogLines represents git log output.
+type GitLogLines []string
+
+func New(c *config.Config) (*Snapshot, error) {
+	snap := &Snapshot{}
 	entries := []*Entry{}
 
 	srcDir := filepath.ToSlash(c.SourceDir) // path normalization (unix slashes)
@@ -23,7 +33,7 @@ func Collect(c *config.Config) ([]*Entry, error) {
 	// pathDepth for calculating the current depth of a path
 	pathDepth := func(p string) int {
 		d := strings.Count(p, "/") - rootDepth
-		fmt.Printf("[r/p]: %d/%d - %s\n", rootDepth, d, p)
+		// fmt.Printf("[r/p]: %d/%d - %s\n", rootDepth, d, p)
 		return d
 	}
 
@@ -37,6 +47,7 @@ func Collect(c *config.Config) ([]*Entry, error) {
 			return wErr
 		}
 
+		// skip root
 		if path == root {
 			return nil
 		}
@@ -45,13 +56,9 @@ func Collect(c *config.Config) ([]*Entry, error) {
 		if err != nil {
 			return err
 		}
-		// absPath, err := filepath.Abs(path)
-		// if err != nil {
-		// 	return err
-		// }
 		relPath = filepath.ToSlash(relPath)
-		// absPath = filepath.ToSlash(absPath)
 
+		// ### filter with matcher
 		if !m.ShouldInclude(relPath, d.IsDir()) {
 			if d.IsDir() {
 				return filepath.SkipDir
@@ -63,56 +70,58 @@ func Collect(c *config.Config) ([]*Entry, error) {
 
 		// ### directories
 		if d.IsDir() {
+			// collapsed directory case:
+			// when a directory is at the end of depth, it gets added to the entires
 			if c.Depth >= 0 && depth >= c.Depth {
-				info, err := dirInfo(path) // using the original path from WalkDir
-				if err != nil {
-					return err
-				}
-				entries = append(entries, NewDir(path, info.TotalSize, info.ItemCount))
-				return filepath.SkipDir
+				entries = append(entries, NewDir(path))
+				return filepath.SkipDir // stop from traversing further down
 			}
 			return nil // proceed with containing items
 		}
 
 		// ### files
-		info, err := d.Info()
-		if err != nil {
-			return nil
-		}
-		entries = append(entries, NewFile(path, info.Size(), false))
+		entries = append(entries, NewFile(path))
 		return nil
 	})
-
-	return entries, err
-}
-
-type DirInfo struct {
-	ItemCount int
-	TotalSize int64
-}
-
-func dirInfo(path string) (DirInfo, error) {
-	var info DirInfo
-
-	entries, err := os.ReadDir(path)
 	if err != nil {
-		return info, err
+		return nil, err
 	}
-	info.ItemCount = len(entries)
 
-	err = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			fileInfo, err := d.Info()
-			if err != nil {
-				return err
-			}
-			info.TotalSize += fileInfo.Size()
-		}
-		return nil
-	})
+	snap.Entries = entries
 
-	return info, err
+	return snap, nil
+}
+
+func (s Snapshot) PrintRawEntries() {
+	for _, e := range s.Entries {
+		p := e.Path
+		if e.IsDir {
+			p = p + "/"
+		}
+		fmt.Printf("%s\n", p)
+	}
+}
+
+// formatSize formats byte size in human-readable format
+func formatSize(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+
+	switch {
+	case bytes == 0:
+		return "0 bytes"
+	case bytes == 1:
+		return "1 byte"
+	case bytes < KB:
+		return fmt.Sprintf("%d bytes", bytes)
+	case bytes < MB:
+		return fmt.Sprintf("%.1f KB", float64(bytes)/KB)
+	case bytes < GB:
+		return fmt.Sprintf("%.1f MB", float64(bytes)/MB)
+	default:
+		return fmt.Sprintf("%.1f GB", float64(bytes)/GB)
+	}
 }

@@ -1,13 +1,17 @@
 package snp
 
+import (
+	"io/fs"
+	"os"
+	"path/filepath"
+)
+
 // Entry represents an entry in the snapshot.
 // depending on IsDir it represents a directory or a file.
 type Entry struct {
 	IsDir bool
 
 	// common
-	// RelPath  string
-	// FullPath string
 	Path string
 	Size int64 // number of bytes
 
@@ -20,24 +24,51 @@ type Entry struct {
 	ItemCount int // the number of direct children in the directory
 }
 
-func NewDir(path string, size int64, itemCount int) *Entry {
+func NewDir(path string) *Entry {
 	return &Entry{
 		IsDir: true,
 		Path:  path,
-		// RelPath:   relPath,
-		// FullPath:  fullPath,
-		Size:      size,
-		ItemCount: itemCount,
 	}
 }
 
-func NewFile(path string, size int64, isBinary bool) *Entry {
+func NewFile(path string) *Entry {
 	return &Entry{
 		IsDir: false,
 		Path:  path,
-		// RelPath:  relPath,
-		// FullPath: fullPath,
-		Size:     size,
-		IsBinary: isBinary,
 	}
+}
+
+type DirInfo struct {
+	ItemCount int
+	TotalSize int64
+}
+
+func (e *Entry) Process() error {
+	return nil
+}
+
+func dirInfo(path string) (DirInfo, error) {
+	var info DirInfo
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return info, err
+	}
+	info.ItemCount = len(entries)
+
+	err = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			fileInfo, err := d.Info()
+			if err != nil {
+				return err
+			}
+			info.TotalSize += fileInfo.Size()
+		}
+		return nil
+	})
+
+	return info, err
 }

@@ -3,51 +3,9 @@ package snp
 import (
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 
-	"github.com/neox5/snp/internal/config"
-	"github.com/neox5/snp/internal/file"
 	"github.com/neox5/snp/internal/writer"
 )
-
-// Snapshot represents the complete snapshot data.
-type Snapshot struct {
-	GitLogLines   GitLogLines
-	Files         []*file.File
-	CollapsedDirs []file.DirEntry
-	Layout        []Content
-}
-
-// GitLogLines represents git log output.
-type GitLogLines []string
-
-// ValidateAndResolve validates the config and resolves absolute paths.
-func ValidateAndResolve(cfg config.Config) (absSourceDir, absOutput string, err error) {
-	srcInfo, err := os.Stat(cfg.SourceDir)
-	if err != nil {
-		return "", "", fmt.Errorf("cannot stat directory %q: %w", cfg.SourceDir, err)
-	}
-	if !srcInfo.IsDir() {
-		return "", "", fmt.Errorf("path %q is not a directory", cfg.SourceDir)
-	}
-
-	absSourceDir, err = filepath.Abs(cfg.SourceDir)
-	if err != nil {
-		return "", "", fmt.Errorf("cannot resolve source directory: %w", err)
-	}
-
-	outputPath := cfg.OutputPath
-	if outputPath == "" {
-		outputPath = config.DefaultOutputPath
-	}
-	absOutput, err = filepath.Abs(outputPath)
-	if err != nil {
-		return "", "", fmt.Errorf("cannot resolve output path %q: %w", outputPath, err)
-	}
-
-	return absSourceDir, absOutput, nil
-}
 
 // // Build creates a complete snapshot.
 // func Build(ctx context.Context, cfg config.Config, absSourceDir string, absOutput string) (*Snapshot, error) {
