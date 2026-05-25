@@ -24,12 +24,9 @@ func Collect(c config.Config) ([]Entry, error) {
 		return strings.Count(p, "/") - rootDepth
 	}
 
-	m, err := matcher.New(c.BuildMatcherRules())
-	if err != nil {
-		return nil, err
-	}
+	m := matcher.New(c.BuildMatcherRules())
 
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, wErr error) error {
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, wErr error) error {
 		if wErr != nil {
 			if errors.Is(wErr, fs.ErrPermission) { // permission errors will be ingnored
 				return nil
@@ -40,7 +37,7 @@ func Collect(c config.Config) ([]Entry, error) {
 		path = filepath.ToSlash(path) // path normalization (unix slashes)
 		depth := pathDepth(path)
 
-		if !m.ShouldInclude(path) {
+		if !m.ShouldInclude(path, d.IsDir()) {
 			return nil
 		}
 

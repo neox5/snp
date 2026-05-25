@@ -51,12 +51,12 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return err
 	}
 
-	if err := cfg.Validate(); err != nil {
+	if err = cfg.Validate(); err != nil {
 		return err
 	}
 
 	if p.SaveConfig {
-		if err := cfg.Save(p.SourceDir); err != nil {
+		if err = cfg.Save(p.SourceDir); err != nil {
 			return err
 		}
 		if !p.Silent {
@@ -81,7 +81,18 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		cfg.BuildMatcherRules().Print("  ")
 	}
 
-	snp.Collect(cfg)
+	entires, err := snp.Collect(cfg)
+	if err != nil {
+		return err
+	}
+
+	for _, e := range entires {
+		if e.IsDir {
+			fmt.Printf("%s (%d items, %s)\n", e.Path, e.ItemCount, formatSize(e.Size))
+			continue
+		}
+		fmt.Printf("%s\n", e.Path)
+	}
 
 	return nil
 }
@@ -92,6 +103,30 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dms", ms)
 	}
 	return fmt.Sprintf("%.1fs", d.Seconds())
+}
+
+// formatSize formats byte size in human-readable format
+func formatSize(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+
+	switch {
+	case bytes == 0:
+		return "0 bytes"
+	case bytes == 1:
+		return "1 byte"
+	case bytes < KB:
+		return fmt.Sprintf("%d bytes", bytes)
+	case bytes < MB:
+		return fmt.Sprintf("%.1f KB", float64(bytes)/KB)
+	case bytes < GB:
+		return fmt.Sprintf("%.1f MB", float64(bytes)/MB)
+	default:
+		return fmt.Sprintf("%.1f GB", float64(bytes)/GB)
+	}
 }
 
 // 	absSourceDir, absOutput, err := snapshot.ValidateAndResolve(cfg)

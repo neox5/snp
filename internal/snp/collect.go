@@ -12,8 +12,8 @@ import (
 	"github.com/neox5/snp/internal/matcher"
 )
 
-func Collect(c *config.Config) ([]Entry, error) {
-	entries := []Entry{}
+func Collect(c *config.Config) ([]*Entry, error) {
+	entries := []*Entry{}
 
 	srcDir := filepath.ToSlash(c.SourceDir) // path normalization (unix slashes)
 	srcDir = filepath.Clean(srcDir)         // produce the shortest possible path
@@ -22,17 +22,19 @@ func Collect(c *config.Config) ([]Entry, error) {
 
 	// pathDepth for calculating the current depth of a path
 	pathDepth := func(p string) int {
-		return strings.Count(p, "/") - rootDepth
+		d := strings.Count(p, "/") - rootDepth
+		fmt.Printf("[r/p]: %d/%d - %s\n", rootDepth, d, p)
+		return d
 	}
 
 	m := matcher.New(c.BuildMatcherRules())
 
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if errors.Is(err, fs.ErrPermission) {
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, wErr error) error {
+		if wErr != nil {
+			if errors.Is(wErr, fs.ErrPermission) {
 				return nil
 			}
-			return err
+			return wErr
 		}
 
 		if path == root {
@@ -43,7 +45,12 @@ func Collect(c *config.Config) ([]Entry, error) {
 		if err != nil {
 			return err
 		}
+		// absPath, err := filepath.Abs(path)
+		// if err != nil {
+		// 	return err
+		// }
 		relPath = filepath.ToSlash(relPath)
+		// absPath = filepath.ToSlash(absPath)
 
 		if !m.ShouldInclude(relPath, d.IsDir()) {
 			if d.IsDir() {
@@ -52,23 +59,27 @@ func Collect(c *config.Config) ([]Entry, error) {
 			return nil
 		}
 
-		depth := pathDepth(relPath)
+		depth := pathDepth(path)
 
 		// ### directories
 		if d.IsDir() {
-			if depth >= c.Depth {
+			if c.Depth >= 0 && depth >= c.Depth {
 				info, err := dirInfo(path) // using the original path from WalkDir
 				if err != nil {
 					return err
 				}
-				fmt.Printf("[%d] %s (%d items, %s)\n", depth, relPath, info.ItemCount, formatBytes(info.TotalSize))
+				entries = append(entries, NewDir(path, info.TotalSize, info.ItemCount))
 				return filepath.SkipDir
 			}
 			return nil // proceed with containing items
 		}
 
 		// ### files
-		fmt.Printf("[%d] %s\n", depth, relPath)
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		entries = append(entries, NewFile(path, info.Size(), false))
 		return nil
 	})
 
@@ -104,17 +115,4 @@ func dirInfo(path string) (DirInfo, error) {
 	})
 
 	return info, err
-}
-
-func formatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
