@@ -1,5 +1,4 @@
-// Package matcher aggregates ordered rules into a matcher that decides
-// whether a given path should be included in a snapshot.
+// Package matcher implements gitignore-style pattern matching and ordered filter rule evaluation.
 package matcher
 
 import (

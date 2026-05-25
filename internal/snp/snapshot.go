@@ -1,3 +1,4 @@
+// Package snp implements the core snapshot pipeline: collection, processing, layout, and output.
 package snp
 
 import (
@@ -38,12 +39,23 @@ func New(c *config.Config) *Snapshot {
 
 // Collect collects git data (if present) and all snapshot entries (files + dirs).
 func (s *Snapshot) Collect(ctx context.Context) error {
-	if isGitRepo(s.Root) {
+	// ### git
+	if !s.Config.NoGitLog && isGitRepo(s.Root) {
 		data, err := collectGitData(ctx, s.Root)
 		if err != nil {
 			return err
 		}
 		s.GitData = data
+	}
+
+	// ### entries
+	if len(s.Config.PickPaths) > 0 {
+		entries, err := collectPick(s.Config, s.Root)
+		if err != nil {
+			return err
+		}
+		s.Entries = entries
+		return nil
 	}
 
 	entries, err := collect(s.Config, s.Root)

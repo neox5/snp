@@ -1,3 +1,4 @@
+// Package config defines the snapshot configuration and handles loading, merging, and validation.
 package config
 
 import (

@@ -2,7 +2,9 @@ package snp
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -48,19 +50,82 @@ func collect(c *config.Config, root string) ([]*Entry, error) {
 
 		depth := pathDepth(path)
 
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+
 		if d.IsDir() {
 			if c.Depth >= 0 && depth >= c.Depth {
-				entries = append(entries, NewDir(path, relPath))
+				e := NewDir(path, relPath)
+				e.Size = info.Size()
+				entries = append(entries, e)
 				return filepath.SkipDir
 			}
 			return nil
 		}
 
-		entries = append(entries, NewFile(path, relPath))
+		e := NewFile(path, relPath)
+		e.Size = info.Size()
+		entries = append(entries, e)
 		return nil
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	return entries, nil
+}
+
+func collectPick(c *config.Config, root string) ([]*Entry, error) {
+	seen := make(map[string]bool)
+	var entries []*Entry
+
+	for _, pattern := range c.PickPaths {
+		var globPattern string
+		if filepath.IsAbs(pattern) {
+			globPattern = pattern
+		} else {
+			globPattern = filepath.Join(root, pattern)
+		}
+
+		matches, err := filepath.Glob(globPattern)
+		if err != nil {
+			return nil, fmt.Errorf("--pick %q: invalid pattern: %w", pattern, err)
+		}
+		if len(matches) == 0 {
+			return nil, fmt.Errorf("--pick %q: no files found", pattern)
+		}
+
+		for _, match := range matches {
+			absMatch, err := filepath.Abs(match)
+			if err != nil {
+				return nil, err
+			}
+
+			if seen[absMatch] {
+				continue
+			}
+			seen[absMatch] = true
+
+			info, err := os.Stat(absMatch)
+			if err != nil {
+				return nil, fmt.Errorf("--pick %q: %w", match, err)
+			}
+			if info.IsDir() {
+				return nil, fmt.Errorf("--pick %q: is a directory, not a file", match)
+			}
+
+			relPath, err := filepath.Rel(root, absMatch)
+			if err != nil {
+				relPath = absMatch
+			}
+			relPath = filepath.ToSlash(relPath)
+
+			e := NewFile(absMatch, relPath)
+			e.Size = info.Size()
+			entries = append(entries, e)
+		}
 	}
 
 	return entries, nil
