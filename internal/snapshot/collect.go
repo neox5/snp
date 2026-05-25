@@ -1,4 +1,4 @@
-package snp
+package snapshot
 
 import (
 	"errors"

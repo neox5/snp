@@ -1,5 +1,5 @@
-// Package snp implements the core snapshot pipeline: collection, processing, layout, and output.
-package snp
+// Package snapshot implements the core snapshot pipeline: collection, processing, layout, and output.
+package snapshot
 
 import (
 	"bufio"

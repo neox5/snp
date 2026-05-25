@@ -9,7 +9,7 @@ import (
 	cli "github.com/urfave/cli/v3"
 
 	"github.com/neox5/snp/internal/config"
-	"github.com/neox5/snp/internal/snp"
+	"github.com/neox5/snp/internal/snapshot"
 )
 
 func cliToParams(c *cli.Command) config.Params {
@@ -93,7 +93,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		cfg.BuildMatcherRules().Print("  ")
 	}
 
-	snap := snp.New(cfg)
+	snap := snapshot.New(cfg)
 
 	if err = snap.Collect(ctx); err != nil {
 		return err

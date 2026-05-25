@@ -1,4 +1,4 @@
-package snp
+package snapshot
 
 func (s *Snapshot) buildLayout() {
 	var layout []Content
