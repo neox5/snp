@@ -7,28 +7,31 @@ import (
 )
 
 // Print writes a human-readable diagnostic representation of Config to stdout.
-func (c Config) Print() {
-	fmt.Println("[snp config]")
-	fmt.Printf("  generated:     %s\n", func() string {
+func (c Config) Print(indent ...string) {
+	prefix := ""
+	if len(indent) > 0 {
+		prefix = indent[0]
+	}
+	fmt.Printf("%sgenerated:     %s\n", prefix, func() string {
 		if c.Generated.IsZero() {
 			return "-"
 		}
 		return c.Generated.Local().Format("2006-01-02 15:04:05")
 	}())
-	fmt.Printf("  source_dir:    %s\n", c.SourceDir)
-	fmt.Printf("  dry_run:       %v\n", c.DryRun)
+	fmt.Printf("%ssource_dir:    %s\n", prefix, c.SourceDir)
+	fmt.Printf("%sdry_run:       %v\n", prefix, c.DryRun)
 	fmt.Println()
-	fmt.Printf("  depth:         %d\n", c.Depth)
-	fmt.Printf("  matcher_flags: %v\n", c.MatcherFlags)
-	fmt.Printf("  pick_paths:    %v\n", c.PickPaths)
-	fmt.Printf("  force_text:    %v\n", c.ForceTextPatterns)
-	fmt.Printf("  force_binary:  %v\n", c.ForceBinaryPatterns)
-	fmt.Printf("  output:        %s\n", c.OutputPath)
-	fmt.Printf("  no_summary:    %v\n", c.NoSummary)
-	fmt.Printf("  no_index:      %v\n", c.NoIndex)
-	fmt.Printf("  no_git_log:    %v\n", c.NoGitLog)
-	fmt.Printf("  no_content:    %v\n", c.NoContent)
-	fmt.Printf("  silent:        %v\n", c.Silent)
+	fmt.Printf("%sdepth:         %d\n", prefix, c.Depth)
+	fmt.Printf("%smatcher_flags: %v\n", prefix, c.MatcherFlags)
+	fmt.Printf("%spick_paths:    %v\n", prefix, c.PickPaths)
+	fmt.Printf("%sforce_text:    %v\n", prefix, c.ForceTextPatterns)
+	fmt.Printf("%sforce_binary:  %v\n", prefix, c.ForceBinaryPatterns)
+	fmt.Printf("%soutput:        %s\n", prefix, c.OutputPath)
+	fmt.Printf("%sno_summary:    %v\n", prefix, c.NoSummary)
+	fmt.Printf("%sno_index:      %v\n", prefix, c.NoIndex)
+	fmt.Printf("%sno_git_log:    %v\n", prefix, c.NoGitLog)
+	fmt.Printf("%sno_content:    %v\n", prefix, c.NoContent)
+	fmt.Printf("%ssilent:        %v\n", prefix, c.Silent)
 }
 
 // BuildCommand returns the equivalent CLI command string for cfg.

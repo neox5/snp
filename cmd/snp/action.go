@@ -79,7 +79,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	// ### print configuration feature
 	if p.PrintConfig {
 		printHeader(true, "snp config")
-		cfg.Print()
+		cfg.Print("  ")
 		return nil
 	}
 
