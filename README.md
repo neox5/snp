@@ -124,12 +124,29 @@ snp --pick "/etc/nginx/nginx.conf"
 
 ```
 --output <path>       Set output file path (default: snapshot.snp)
+--stdout              Write snapshot to stdout instead of a file
 --no-summary          Omit summary section
 --no-index            Omit file index section
 --no-git-log          Omit git log section
 --no-content          Omit file content sections
+--only-summary        Include only summary section
+--only-index          Include only file index section
+--only-git-log        Include only git log section
+--only-content        Include only file content sections
 --dry-run             List files without creating output
 --silent              Suppress all stdout
+```
+
+`--only-<section>` flags are the inverse of `--no-<section>` flags and can be freely combined. `--only-index --only-summary` includes both sections. Combining `--only-<section>` and `--no-<section>` flags that result in all sections being suppressed is an error.
+
+When `--stdout` is used, all status messages are written to stderr so that stdout carries only snapshot content.
+
+```bash
+# Pipe only the file index into another tool
+snp --only-index --stdout 2>/dev/null | grep "\.go"
+
+# Save content section only to a custom path
+snp --only-content --stdout > content.txt
 ```
 
 ## Binary and Text Overrides
@@ -190,7 +207,7 @@ README.md [63-83] (21 lines, 1.1 KB)
 [Binary file - 43.7 KB - content omitted]
 ```
 
-Use the file index to navigate by line number.
+Use the file index to navigate by line number. Line ranges are omitted when content sections are excluded.
 
 ## Working with AI Tools
 
