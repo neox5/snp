@@ -42,7 +42,7 @@ func NewFile(path, relPath string) *Entry {
 func (e *Entry) LineCount() int { return len(e.Lines) }
 
 // WriteTo implements Content.
-func (e *Entry) WriteTo(w io.Writer) (int, error) {
+func (e *Entry) WriteTo(w io.Writer) (int64, error) {
 	for _, line := range e.Lines {
 		if _, err := fmt.Fprintln(w, line); err != nil {
 			return 0, err

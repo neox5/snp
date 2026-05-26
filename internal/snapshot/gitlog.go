@@ -20,7 +20,7 @@ type GitData struct {
 func (d *GitData) LineCount() int { return len(d.LogLines) }
 
 // WriteTo implements Content.
-func (d *GitData) WriteTo(w io.Writer) (int, error) {
+func (d *GitData) WriteTo(w io.Writer) (int64, error) {
 	for _, line := range d.LogLines {
 		if _, err := fmt.Fprintln(w, line); err != nil {
 			return 0, err

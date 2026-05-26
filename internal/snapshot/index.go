@@ -13,7 +13,7 @@ type index struct {
 
 func (idx *index) LineCount() int { return len(idx.Entries) }
 
-func (idx *index) WriteTo(w io.Writer) (int, error) {
+func (idx *index) WriteTo(w io.Writer) (int64, error) {
 	type item struct {
 		path string
 		line string

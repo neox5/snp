@@ -8,7 +8,7 @@ import (
 // Content represents anything that can be written to the snapshot output.
 type Content interface {
 	LineCount() int
-	WriteTo(w io.Writer) (int, error)
+	WriteTo(io.Writer) (int64, error)
 }
 
 // header represents a section header line.
@@ -18,8 +18,9 @@ type header struct {
 
 func (h *header) LineCount() int { return 1 }
 
-func (h *header) WriteTo(w io.Writer) (int, error) {
-	return fmt.Fprintln(w, "# "+h.Text)
+func (h *header) WriteTo(w io.Writer) (int64, error) {
+	_, err := fmt.Fprintln(w, "# "+h.Text)
+	return 0, err
 }
 
 // divider represents the blank + separator + blank lines between sections.
@@ -27,8 +28,9 @@ type divider struct{}
 
 func (d *divider) LineCount() int { return 1 }
 
-func (d *divider) WriteTo(w io.Writer) (int, error) {
-	return fmt.Fprintln(w, "# ---")
+func (d *divider) WriteTo(w io.Writer) (int64, error) {
+	_, err := fmt.Fprintln(w, "# ---")
+	return 0, err
 }
 
 // formatSize formats byte size in human-readable format.

@@ -17,7 +17,7 @@ type Summary struct {
 
 func (s *Summary) LineCount() int { return 4 }
 
-func (s *Summary) WriteTo(w io.Writer) (int, error) {
+func (s *Summary) WriteTo(w io.Writer) (int64, error) {
 	lines := [4]string{
 		"Generated: " + s.Timestamp,
 		fmt.Sprintf("Total files: %d (%d text, %d binary)", s.TotalFiles, s.TextFiles, s.BinaryFiles),
