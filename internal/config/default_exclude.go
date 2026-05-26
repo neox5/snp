@@ -27,6 +27,9 @@ var DefaultExcludePatterns = []string{
 	"*.log",
 	"*.tmp",
 
+	// snp config
+	".snpconfig.json",
+
 	// Snapshot files themselves
 	"**/*.snp",
 	"**/*.snp.txt",
