@@ -23,7 +23,7 @@ func cliToParams(c *cli.Command) config.Params {
 		Args:                os.Args[1:], // included for determine order of include/exclude flags
 		NoConfig:            c.Bool("no-config"),
 		SaveConfig:          c.Bool("save-config"),
-		PrintConfig:         c.Bool("print-config"),
+		ShowConfig:          c.Bool("show-config"),
 		DryRun:              c.Bool("dry-run"),
 		Depth:               c.Int("depth"),
 		PickPaths:           c.StringSlice("pick"),
@@ -77,9 +77,11 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	}
 
 	// ### print configuration feature
-	if p.PrintConfig {
+	if p.ShowConfig {
 		printHeader(true, "snp config")
 		cfg.Print("  ")
+		printHeader(false, "command")
+		fmt.Println(cfg.BuildCommand())
 		return nil
 	}
 

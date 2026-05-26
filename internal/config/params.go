@@ -13,7 +13,7 @@ type Params struct {
 	Args         []string
 	NoConfig     bool
 	SaveConfig   bool
-	PrintConfig  bool
+	ShowConfig   bool
 	DryRun       bool
 	VerboseLevel int
 	// persistable
@@ -55,7 +55,7 @@ func (p Params) Print() {
 	fmt.Printf("  args:          [%s]\n", strings.Join(p.Args, " "))
 	fmt.Printf("  no_config:     %v\n", p.NoConfig)
 	fmt.Printf("  save_config:   %v\n", p.SaveConfig)
-	fmt.Printf("  print_config:  %v\n", p.PrintConfig)
+	fmt.Printf("  show_config:  %v\n", p.ShowConfig)
 	fmt.Printf("  dry_run:       %v\n", p.DryRun)
 	fmt.Printf("  verbose:       %d\n", p.VerboseLevel)
 	fmt.Println()

@@ -132,7 +132,7 @@ Examples:
 				Usage: "Save current flags to .snpconfig in source directory and exit",
 			},
 			&cli.BoolFlag{
-				Name:  "print-config",
+				Name:  "show-config",
 				Usage: "Print current config and equivalent snp command, then exit",
 			},
 		},
