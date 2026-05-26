@@ -15,7 +15,7 @@ func (c *Config) Save(path string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(filepath.Join(path, ConfigFileName), data, 0o644)
 }
 
 func LoadConfig(p Params) (*Config, error) {
