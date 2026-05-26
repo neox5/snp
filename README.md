@@ -48,15 +48,14 @@ Recursively walks the directory tree and filters files by ordered rules.
 **Implicit default** (when no baseline flag is given):
 
 ```bash
-snp  # equivalent to: snp --include-all --exclude-defaults
+snp  # include all files, applying default exclude patterns and .gitignore
 ```
 
 **Baseline flags** — set the starting state, evaluated in position order:
 
 ```
---include-all         Include all files
+--include-all         Include all files (overrides default excludes)
 --exclude-all         Exclude all files
---exclude-defaults    Exclude default patterns and .gitignore (see --show-defaults)
 ```
 
 **Filter flags** — stack on top of baseline, evaluated in position order:
@@ -73,13 +72,19 @@ All flags are positional — **last matching rule wins**. Baseline and filter fl
 snp --exclude-all --include "**/*.go"
 
 # Everything except tests
-snp --include-all --exclude-defaults --exclude "**/*_test.go"
+snp --exclude-all --include "**/*.go" --include "**/*.md"
 
 # Everything except tests, but keep one specific test
-snp --include-all --exclude-defaults --exclude "**/*_test.go" --include "internal/auth/auth_test.go"
+snp --include-all --exclude "**/*_test.go" --include "internal/auth/auth_test.go"
 
 # Everything, including .git/ and other normally excluded files
 snp --include-all
+```
+
+**Depth control:**
+
+```
+--depth <n>           Limit traversal depth (0 = root only, -1 = unlimited, default: -1)
 ```
 
 **Utility:**
@@ -113,13 +118,16 @@ snp --pick "repo-a/cmd/main.go" --pick "repo-b/cmd/main.go"
 snp --pick "/etc/nginx/nginx.conf"
 ```
 
-`--pick` cannot be combined with `--include`, `--exclude`, `--include-all`, `--exclude-all`, or `--exclude-defaults`.
+`--pick` cannot be combined with `--include`, `--exclude`, `--include-all`, `--exclude-all`, or `--depth`.
 
 ## Output
 
 ```
 --output <path>       Set output file path (default: snapshot.snp)
---exclude-git-log     Omit the Git log section
+--no-summary          Omit summary section
+--no-index            Omit file index section
+--no-git-log          Omit git log section
+--no-content          Omit file content sections
 --dry-run             List files without creating output
 --silent              Suppress all stdout
 ```
@@ -135,11 +143,30 @@ Applies to both modes. Binary files are detected automatically and shown as meta
 
 `--force-binary` wins over `--force-text` on conflict.
 
+## Configuration File
+
+Flags can be persisted to `.snpconfig.json` in the source directory. Config file flags are merged with CLI flags; CLI flags take precedence.
+
+```
+--save-config         Save current flags to .snpconfig.json and exit
+--show-config         Print current config and equivalent snp command, then exit
+--no-config           Skip .snpconfig.json even if present
+```
+
+```bash
+# Save current invocation as default for this directory
+snp --exclude-all --include "**/*.go" --save-config
+
+# Inspect resolved config
+snp --show-config
+```
+
 ## Output Format
 
 ```text
 Generated: 2025-12-14 18:13:40
 Total files: 24 (23 text, 1 binary)
+Total size: 1.2 MB
 Total lines: 2284
 
 # File Index
