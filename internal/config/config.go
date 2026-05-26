@@ -59,6 +59,13 @@ type Flag struct {
 	Value string   `json:"value"`
 }
 
+func (f Flag) String() string {
+	if f.Value == "" {
+		return f.Type.String()
+	}
+	return f.Type.String() + ":" + f.Value
+}
+
 type Config struct {
 	Generated           time.Time `json:"generated"`
 	SourceDir           string    `json:"source_dir"`

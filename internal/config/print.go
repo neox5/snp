@@ -22,7 +22,7 @@ func (c Config) Print(indent ...string) {
 	fmt.Printf("%sdry_run:       %v\n", prefix, c.DryRun)
 	fmt.Println()
 	fmt.Printf("%sdepth:         %d\n", prefix, c.Depth)
-	fmt.Printf("%smatcher_flags: %v\n", prefix, c.MatcherFlags)
+	fmt.Printf("%smatcher_flags: %s\n", prefix, c.MatcherFlags)
 	fmt.Printf("%spick_paths:    %v\n", prefix, c.PickPaths)
 	fmt.Printf("%sforce_text:    %v\n", prefix, c.ForceTextPatterns)
 	fmt.Printf("%sforce_binary:  %v\n", prefix, c.ForceBinaryPatterns)
