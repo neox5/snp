@@ -79,6 +79,7 @@ type Config struct {
 	NoIndex             bool      `json:"no_index"`
 	NoGitLog            bool      `json:"no_git_log"`
 	NoContent           bool      `json:"no_content"`
+	Stdout              bool      `json:"stdout"`
 	DryRun              bool      `json:"dry_run"`
 	Silent              bool      `json:"silent"`
 }
@@ -108,6 +109,7 @@ func (c Config) Merge(other Config) *Config {
 		NoIndex:             other.NoIndex,
 		NoGitLog:            other.NoGitLog,
 		NoContent:           other.NoContent,
+		Stdout:              other.Stdout,
 		DryRun:              other.DryRun,
 		Silent:              other.Silent,
 	}
@@ -120,11 +122,14 @@ func (c Config) Validate() error {
 	if len(c.PickPaths) > 0 && c.Depth > -1 {
 		return fmt.Errorf("--depth cannot be combined with --pick")
 	}
+	if c.NoSummary && c.NoIndex && c.NoGitLog && c.NoContent {
+		return fmt.Errorf("all sections suppressed: use --only-<section> or remove conflicting --no-<section> flags")
+	}
 	return nil
 }
 
 func (c Config) BuildMatcherRules() matcher.Rules {
-	r := buildExcludeDefaultRules(c.SourceDir) // apply default excludes first
+	r := buildExcludeDefaultRules(c.SourceDir)
 
 	for _, f := range c.MatcherFlags {
 		switch f.Type {

@@ -1,6 +1,9 @@
 package matcher
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+)
 
 // RuleType defines the kind of rule.
 type RuleType int
@@ -60,7 +63,7 @@ func (r Rules) AddInclude(p string) Rules {
 	return append(r, Rule{Type: RuleInclude, Pattern: p})
 }
 
-func (r Rules) Print(indent ...string) {
+func (r Rules) Print(w io.Writer, indent ...string) {
 	prefix := ""
 	if len(indent) > 0 {
 		prefix = indent[0]
@@ -68,13 +71,13 @@ func (r Rules) Print(indent ...string) {
 	for _, rule := range r {
 		switch rule.Type {
 		case RuleInclude:
-			fmt.Printf("%s[+] %s\n", prefix, rule.Pattern)
+			fmt.Fprintf(w, "%s[+] %s\n", prefix, rule.Pattern)
 		case RuleExclude:
-			fmt.Printf("%s[-] %s\n", prefix, rule.Pattern)
+			fmt.Fprintf(w, "%s[-] %s\n", prefix, rule.Pattern)
 		case RuleIncludeAll:
-			fmt.Printf("%s[+] ALL\n", prefix)
+			fmt.Fprintf(w, "%s[+] ALL\n", prefix)
 		case RuleExcludeAll:
-			fmt.Printf("%s[-] ALL\n", prefix)
+			fmt.Fprintf(w, "%s[-] ALL\n", prefix)
 		}
 	}
 }

@@ -26,10 +26,17 @@ type Params struct {
 	NoIndex             bool
 	NoGitLog            bool
 	NoContent           bool
+	OnlySummary         bool
+	OnlyIndex           bool
+	OnlyGitLog          bool
+	OnlyContent         bool
+	Stdout              bool
 	Silent              bool
 }
 
 func (p Params) ToConfig() *Config {
+	hasOnly := p.OnlySummary || p.OnlyIndex || p.OnlyGitLog || p.OnlyContent
+
 	return &Config{
 		Generated:           time.Now(),
 		SourceDir:           p.SourceDir,
@@ -39,10 +46,11 @@ func (p Params) ToConfig() *Config {
 		ForceTextPatterns:   p.ForceTextPatterns,
 		ForceBinaryPatterns: p.ForceBinaryPatterns,
 		OutputPath:          p.OutputPath,
-		NoSummary:           p.NoSummary,
-		NoIndex:             p.NoIndex,
-		NoGitLog:            p.NoGitLog,
-		NoContent:           p.NoContent,
+		NoSummary:           (hasOnly && !p.OnlySummary) || p.NoSummary,
+		NoIndex:             (hasOnly && !p.OnlyIndex) || p.NoIndex,
+		NoGitLog:            (hasOnly && !p.OnlyGitLog) || p.NoGitLog,
+		NoContent:           (hasOnly && !p.OnlyContent) || p.NoContent,
+		Stdout:              p.Stdout,
 		DryRun:              p.DryRun,
 		Silent:              p.Silent,
 	}
@@ -68,6 +76,11 @@ func (p Params) Print() {
 	fmt.Printf("  no_index:      %v\n", p.NoIndex)
 	fmt.Printf("  no_git_log:    %v\n", p.NoGitLog)
 	fmt.Printf("  no_content:    %v\n", p.NoContent)
+	fmt.Printf("  only_summary:  %v\n", p.OnlySummary)
+	fmt.Printf("  only_index:    %v\n", p.OnlyIndex)
+	fmt.Printf("  only_git_log:  %v\n", p.OnlyGitLog)
+	fmt.Printf("  only_content:  %v\n", p.OnlyContent)
+	fmt.Printf("  stdout:        %v\n", p.Stdout)
 	fmt.Printf("  silent:        %v\n", p.Silent)
 }
 

@@ -31,6 +31,7 @@ func (c Config) Print(indent ...string) {
 	fmt.Printf("%sno_index:      %v\n", prefix, c.NoIndex)
 	fmt.Printf("%sno_git_log:    %v\n", prefix, c.NoGitLog)
 	fmt.Printf("%sno_content:    %v\n", prefix, c.NoContent)
+	fmt.Printf("%sstdout:        %v\n", prefix, c.Stdout)
 	fmt.Printf("%ssilent:        %v\n", prefix, c.Silent)
 }
 
@@ -71,6 +72,9 @@ func (c Config) BuildCommand() string {
 	}
 	if c.NoContent {
 		parts = append(parts, "--no-content")
+	}
+	if c.Stdout {
+		parts = append(parts, "--stdout")
 	}
 	if c.Silent {
 		parts = append(parts, "--silent")

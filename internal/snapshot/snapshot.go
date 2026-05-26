@@ -67,14 +67,14 @@ func (s *Snapshot) Collect(ctx context.Context) error {
 	return nil
 }
 
-// PrintRawEntries prints only entiry paths (dry-run)
-func (s Snapshot) PrintRawEntries() {
+// PrintRawEntries prints only entry paths (dry-run) to w.
+func (s Snapshot) PrintRawEntries(w io.Writer) {
 	for _, e := range s.Entries {
 		p := e.Path
 		if e.IsDir {
 			p = p + "/"
 		}
-		fmt.Printf("%s\n", p)
+		fmt.Fprintf(w, "%s\n", p)
 	}
 }
 

@@ -74,7 +74,7 @@ Examples:
 				Name:  "pick",
 				Usage: "Include only these exact paths (repeatable, mutually exclusive with traversal flags)",
 			},
-			// Output sections
+			// Output sections — exclusion
 			&cli.BoolFlag{
 				Name:  "no-summary",
 				Usage: "Omit summary section",
@@ -91,6 +91,23 @@ Examples:
 				Name:  "no-content",
 				Usage: "Omit file content sections",
 			},
+			// Output sections — selection
+			&cli.BoolFlag{
+				Name:  "only-summary",
+				Usage: "Include only summary section (inverse of --no-summary)",
+			},
+			&cli.BoolFlag{
+				Name:  "only-index",
+				Usage: "Include only file index section (inverse of --no-index)",
+			},
+			&cli.BoolFlag{
+				Name:  "only-git-log",
+				Usage: "Include only git log section (inverse of --no-git-log)",
+			},
+			&cli.BoolFlag{
+				Name:  "only-content",
+				Usage: "Include only file content sections (inverse of --no-content)",
+			},
 			// Output control
 			&cli.StringFlag{
 				Name:        "output",
@@ -98,6 +115,10 @@ Examples:
 				Usage:       "Output file path",
 				DefaultText: config.DefaultOutputPath,
 				Value:       config.DefaultOutputPath,
+			},
+			&cli.BoolFlag{
+				Name:  "stdout",
+				Usage: "Write snapshot to stdout instead of a file",
 			},
 			&cli.BoolFlag{
 				Name:    "dry-run",

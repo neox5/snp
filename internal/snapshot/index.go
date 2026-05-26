@@ -27,6 +27,8 @@ func (idx *index) WriteTo(w io.Writer) (int, error) {
 			line = fmt.Sprintf("%s (%d items, %s)", e.RelPath, e.ItemCount, formatSize(e.Size))
 		case e.IsBinary:
 			line = fmt.Sprintf("%s [%d-%d] (binary, %s)", e.RelPath, e.StartLine, e.EndLine, formatSize(e.Size))
+		case e.StartLine == 0 && e.EndLine == 0:
+			line = fmt.Sprintf("%s (%d lines, %s)", e.RelPath, len(e.Lines), formatSize(e.Size))
 		default:
 			line = fmt.Sprintf("%s [%d-%d] (%d lines, %s)", e.RelPath, e.StartLine, e.EndLine, len(e.Lines), formatSize(e.Size))
 		}

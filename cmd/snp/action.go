@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -20,7 +21,7 @@ func cliToParams(c *cli.Command) config.Params {
 
 	return config.Params{
 		SourceDir:           sourceDir,
-		Args:                os.Args[1:], // included for determine order of include/exclude flags
+		Args:                os.Args[1:],
 		NoConfig:            c.Bool("no-config"),
 		SaveConfig:          c.Bool("save-config"),
 		ShowConfig:          c.Bool("show-config"),
@@ -34,6 +35,11 @@ func cliToParams(c *cli.Command) config.Params {
 		NoIndex:             c.Bool("no-index"),
 		NoGitLog:            c.Bool("no-git-log"),
 		NoContent:           c.Bool("no-content"),
+		OnlySummary:         c.Bool("only-summary"),
+		OnlyIndex:           c.Bool("only-index"),
+		OnlyGitLog:          c.Bool("only-git-log"),
+		OnlyContent:         c.Bool("only-content"),
+		Stdout:              c.Bool("stdout"),
 		Silent:              c.Bool("silent"),
 		VerboseLevel:        verboseCount,
 	}
@@ -45,7 +51,6 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return nil
 	}
 
-	// ### process cli parameters and convert to config
 	p := cliToParams(c)
 	cfg, err := config.LoadConfig(p)
 	if err != nil {
@@ -56,7 +61,6 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return err
 	}
 
-	// ### save configuration feature
 	if p.SaveConfig {
 		if err = cfg.Save(p.SourceDir); err != nil {
 			return err
@@ -67,32 +71,35 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return nil
 	}
 
-	// printHeader is used to give a uniform way of printing a header block.
-	// it also adds a separation line if first != true
-	printHeader := func(first bool, h string) {
-		if !first {
-			fmt.Println()
-		}
-		fmt.Printf("[%s]\n", h)
+	// status writes to stderr when stdout carries snapshot content
+	status := os.Stdout
+	if cfg.Stdout {
+		status = os.Stderr
 	}
 
-	// ### print configuration feature
+	printHeader := func(first bool, h string) {
+		if !first {
+			fmt.Fprintln(status)
+		}
+		fmt.Fprintf(status, "[%s]\n", h)
+	}
+
 	if p.ShowConfig {
 		printHeader(true, "snp config")
 		cfg.Print("  ")
 		printHeader(false, "command")
-		fmt.Println(cfg.BuildCommand())
+		fmt.Fprintln(status, cfg.BuildCommand())
 		return nil
 	}
 
 	if !cfg.Silent {
 		printHeader(true, "command")
-		fmt.Println(cfg.BuildCommand())
+		fmt.Fprintln(status, cfg.BuildCommand())
 	}
 
 	if p.VerboseLevel >= 2 {
 		printHeader(false, "Matcher Rules")
-		cfg.BuildMatcherRules().Print("  ")
+		cfg.BuildMatcherRules().Print(status, "  ")
 	}
 
 	snap := snapshot.New(cfg)
@@ -101,18 +108,24 @@ func runAction(ctx context.Context, c *cli.Command) error {
 		return err
 	}
 
-	// ### dry run feature
 	if p.DryRun {
 		printHeader(false, "Dry Run")
-		snap.PrintRawEntries()
+		snap.PrintRawEntries(status)
 		return nil
 	}
 
 	start := time.Now()
 
-	// ### build Snapshot
 	if err = snap.Build(); err != nil {
 		return err
+	}
+
+	if cfg.Stdout {
+		bw := bufio.NewWriter(os.Stdout)
+		if _, err = snap.WriteTo(bw); err != nil {
+			return err
+		}
+		return bw.Flush()
 	}
 
 	if err = snap.Write(); err != nil {
@@ -120,7 +133,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	}
 
 	if !cfg.Silent {
-		fmt.Printf("Snapshot written: %s (%s)\n", cfg.OutputPath, formatDuration(time.Since(start)))
+		fmt.Fprintf(status, "Snapshot written: %s (%s)\n", cfg.OutputPath, formatDuration(time.Since(start)))
 	}
 
 	return nil
