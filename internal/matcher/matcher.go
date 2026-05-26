@@ -4,7 +4,6 @@ package matcher
 import (
 	"fmt"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -74,9 +73,11 @@ func (m *Matcher) ShouldInclude(relPath string, isDir bool) bool {
 //     Matches the directory itself (only if isDir=true) and all paths under it.
 //     "node_modules/" matches "node_modules" (if isDir) and "node_modules/pkg/foo.js".
 //
-//  2. No slash (e.g. "*.test.js", "README.md"):
-//     Matches the last path segment (filename) at any depth.
+//  2. No slash (e.g. "*.test.js", "README.md", "internal"):
+//     Matches any path segment at any depth.
 //     "*.test.js" matches "src/tests/kernel.test.js" and "kernel.test.js".
+//     "internal" matches "internal", "internal/config", "internal/config/config.go",
+//     and "cmd/internal/main.go".
 //
 //  3. Leading slash (e.g. "/README.md"):
 //     Anchored to the start of relPath. Matches only the exact path.
@@ -99,9 +100,20 @@ func Match(pattern, relPath string, isDir bool) (bool, error) {
 			strings.HasPrefix(relPath, prefix+"/"), nil
 	}
 
-	// Rule 2: no slash — match filename component only
+	// Rule 2: no slash — match against every path segment
+	// "internal" matches any path containing "internal" as a segment:
+	// "internal", "internal/config", "cmd/internal/main.go"
 	if !strings.Contains(pattern, "/") {
-		return path.Match(pattern, filepath.Base(relPath))
+		for segment := range strings.SplitSeq(relPath, "/") {
+			ok, err := path.Match(pattern, segment)
+			if err != nil {
+				return false, err
+			}
+			if ok {
+				return true, nil
+			}
+		}
+		return false, nil
 	}
 
 	// Rules 3 & 4: slash present — anchored full path match
