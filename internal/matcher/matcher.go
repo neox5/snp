@@ -7,25 +7,73 @@ import (
 	"strings"
 )
 
-// Matcher holds an ordered list of compiled rules. Last match wins.
+// Matcher holds an ordered list of compiled rules and pre-computed traversal sets.
+//
+// Rules answer the question "should this file appear in output?" and are
+// evaluated at call time by ShouldInclude.
+//
+// Traversal sets answer the question "should this directory be entered?" and
+// are pre-computed once from the include patterns at construction time by
+// ShouldTraverse.
 type Matcher struct {
-	rules Rules
+	rules             Rules
+	parentPrefixes    map[string]bool // exact dirs required as passthrough
+	recursivePrefixes map[string]bool // dirs whose entire subtrees must be entered
+	traverseAll       bool            // any include pattern can match at any depth
 }
 
 // New builds a Matcher from an ordered list of rules.
+// Traversal sets are pre-computed from the include patterns.
 func New(rs Rules) *Matcher {
-	return &Matcher{rules: rs}
+	m := &Matcher{rules: rs}
+	m.parentPrefixes, m.recursivePrefixes, m.traverseAll = buildTraversalSets(rs)
+	return m
 }
 
-// ShouldInclude returns true if relPath should be included.
+// ShouldInclude returns true if the file at relPath should appear in output.
 // Rules are evaluated in order; last match wins.
 // If no rule matches, the file is included by default.
-func (m *Matcher) ShouldInclude(relPath string, isDir bool) bool {
+// Only call for files — directories are handled by ShouldTraverse.
+func (m *Matcher) ShouldInclude(relPath string) bool {
+	if m == nil {
+		return true
+	}
+	return m.evalRules(relPath, false)
+}
+
+// ShouldTraverse returns true if the directory at relPath should be entered.
+//
+// Two-stage evaluation:
+//  1. Traversal sets — if any include pattern requires descending through this
+//     directory, return true immediately regardless of rule outcomes.
+//  2. Rule evaluation — normal include/exclude logic with isDir=true.
+//
+// Only call for directories — files are handled by ShouldInclude.
+func (m *Matcher) ShouldTraverse(relPath string) bool {
 	if m == nil {
 		return true
 	}
 
-	// default
+	// Stage 1: traversal sets express intent that cannot be blocked by rules.
+	if m.traverseAll {
+		return true
+	}
+	if m.parentPrefixes[relPath] {
+		return true
+	}
+	for prefix := range m.recursivePrefixes {
+		if relPath == prefix || strings.HasPrefix(relPath, prefix+"/") {
+			return true
+		}
+	}
+
+	// Stage 2: fall back to rule evaluation.
+	return m.evalRules(relPath, true)
+}
+
+// evalRules evaluates all rules against relPath in order; last match wins.
+// isDir controls Rule 1 (trailing slash) matching in Match.
+func (m *Matcher) evalRules(relPath string, isDir bool) bool {
 	result := true
 
 	for _, r := range m.rules {
@@ -61,6 +109,98 @@ func (m *Matcher) ShouldInclude(relPath string, isDir bool) bool {
 	}
 
 	return result
+}
+
+// buildTraversalSets pre-computes directory traversal intent from include rules.
+//
+// Each RuleInclude pattern is classified by scanning its directory segments
+// (all segments except the last) for the first glob character or **:
+//
+//   - No slash or leading ** → traverseAll (match possible at any depth)
+//   - Exact prefix before first glob → parentPrefixes (known ancestor chain)
+//   - Glob at or beyond pivot → recursivePrefixes (subtree must be entered)
+//   - Trailing ** as last segment → recursivePrefixes on the prefix
+func buildTraversalSets(rules Rules) (parentPrefixes map[string]bool, recursivePrefixes map[string]bool, traverseAll bool) {
+	parentPrefixes = make(map[string]bool)
+	recursivePrefixes = make(map[string]bool)
+
+	for _, r := range rules {
+		if r.Type != RuleInclude || r.Pattern == "" {
+			continue
+		}
+
+		pattern := r.Pattern
+
+		// No slash: Match rule 2 handles these at any depth.
+		if !strings.Contains(pattern, "/") {
+			traverseAll = true
+			continue
+		}
+
+		// Normalize: strip leading and trailing slashes.
+		pattern = strings.TrimPrefix(pattern, "/")
+		pattern = strings.TrimSuffix(pattern, "/")
+
+		parts := strings.Split(pattern, "/")
+
+		// Single segment after normalization: root-level target, no parents needed.
+		if len(parts) <= 1 {
+			continue
+		}
+
+		// Directory segments are everything except the last segment.
+		// For file patterns: last segment is the file matcher.
+		// For trailing-slash patterns (already trimmed): last segment was the target dir.
+		// In both cases the last segment is matched directly by Match — not our concern here.
+		dirParts := parts[:len(parts)-1]
+
+		// Find pivot: first dir segment that is ** or contains a glob character.
+		pivot := len(dirParts)
+		for i, seg := range dirParts {
+			if seg == "**" || containsGlob(seg) {
+				pivot = i
+				break
+			}
+		}
+
+		if pivot == 0 {
+			// First dir segment is already a glob — any directory could match.
+			traverseAll = true
+			continue
+		}
+
+		// Exact prefix: all dir segments before the pivot.
+		exactPrefix := strings.Join(dirParts[:pivot], "/")
+		addParentChain(parentPrefixes, exactPrefix)
+
+		// If glob segments exist at or beyond the pivot, matching may extend
+		// to arbitrary depth — the subtree under exactPrefix must be entered.
+		if pivot < len(dirParts) {
+			recursivePrefixes[exactPrefix] = true
+		}
+
+		// Trailing **: last segment of the full pattern (not just dirParts).
+		// e.g. "internal/**" — the subtree under exactPrefix must be entered.
+		if parts[len(parts)-1] == "**" {
+			recursivePrefixes[exactPrefix] = true
+		}
+	}
+
+	return
+}
+
+// addParentChain adds dirPath and every ancestor path to parents.
+// "a/b/c" adds "a", "a/b", and "a/b/c".
+func addParentChain(parents map[string]bool, dirPath string) {
+	parts := strings.Split(dirPath, "/")
+	for i := 1; i <= len(parts); i++ {
+		parents[strings.Join(parts[:i], "/")] = true
+	}
+}
+
+// containsGlob reports whether s contains any glob metacharacter.
+func containsGlob(s string) bool {
+	return strings.ContainsAny(s, "*?[")
 }
 
 // Match reports whether relPath matches the given gitignore-style pattern.
@@ -126,6 +266,8 @@ func Match(pattern, relPath string, isDir bool) (bool, error) {
 
 // matchSegments matches ordered pattern segments against path segments.
 // ** as a segment matches zero or more path segments.
+// When the pattern is exhausted, remaining path parts are allowed —
+// a matched prefix also matches everything beneath it.
 func matchSegments(pat, parts []string) (bool, error) {
 	for len(pat) > 0 {
 		seg := pat[0]
@@ -163,6 +305,7 @@ func matchSegments(pat, parts []string) (bool, error) {
 		parts = parts[1:]
 	}
 
-	// pattern exhausted — must have consumed all path parts
-	return len(parts) == 0, nil
+	// Pattern exhausted — the path starts with the matched prefix.
+	// Remaining parts mean the path is inside the matched directory: include it.
+	return true, nil
 }

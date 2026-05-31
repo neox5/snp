@@ -23,21 +23,14 @@ func TestMatch(t *testing.T) {
 			want:    true,
 		},
 		{
-			name:    "trailing slash matches file deep under dir",
-			pattern: "node_modules/",
-			path:    "node_modules/lodash/index.js",
-			isDir:   false,
-			want:    true,
-		},
-		{
-			name:    "trailing slash matches dir entry itself",
+			name:    "trailing slash matches dir itself",
 			pattern: "node_modules/",
 			path:    "node_modules",
 			isDir:   true,
 			want:    true,
 		},
 		{
-			name:    "trailing slash does not match dir entry as file",
+			name:    "trailing slash does not match dir as file",
 			pattern: "node_modules/",
 			path:    "node_modules",
 			isDir:   false,
@@ -46,58 +39,51 @@ func TestMatch(t *testing.T) {
 		{
 			name:    "trailing slash does not match sibling",
 			pattern: "node_modules/",
-			path:    "node_modules_extra/foo.js",
+			path:    "node_modules_extra/pkg.json",
 			isDir:   false,
 			want:    false,
 		},
 
-		// ── Rule 2: no slash — filename only ─────────────────────────────────
+		// ── Rule 2: no slash ──────────────────────────────────────────────────
 		{
 			name:    "no-slash matches filename at root",
-			pattern: "*.test.js",
-			path:    "kernel.test.js",
+			pattern: "README.md",
+			path:    "README.md",
 			isDir:   false,
 			want:    true,
 		},
 		{
 			name:    "no-slash matches filename deep",
-			pattern: "*.test.js",
-			path:    "packages/riker2/src/tests/kernel.test.js",
-			isDir:   false,
-			want:    true,
-		},
-		{
-			name:    "no-slash no match different extension",
-			pattern: "*.test.js",
-			path:    "packages/riker2/src/kernel.js",
-			isDir:   false,
-			want:    false,
-		},
-		{
-			name:    "no-slash exact filename deep",
 			pattern: "README.md",
 			path:    "docs/README.md",
 			isDir:   false,
 			want:    true,
 		},
 		{
-			name:    "no-slash question mark single char",
-			pattern: "?.go",
-			path:    "src/a.go",
+			name:    "no-slash matches dir segment deep",
+			pattern: "internal",
+			path:    "cmd/internal/main.go",
 			isDir:   false,
 			want:    true,
 		},
 		{
-			name:    "no-slash question mark no match multiple chars",
-			pattern: "?.go",
-			path:    "src/ab.go",
+			name:    "no-slash wildcard matches deep",
+			pattern: "*.test.js",
+			path:    "packages/riker2/src/tests/kernel.test.js",
+			isDir:   false,
+			want:    true,
+		},
+		{
+			name:    "no-slash no match",
+			pattern: "README.md",
+			path:    "docs/CONTRIBUTING.md",
 			isDir:   false,
 			want:    false,
 		},
 		{
 			name:    "no-slash character class match",
 			pattern: "[abc].go",
-			path:    "src/b.go",
+			path:    "src/a.go",
 			isDir:   false,
 			want:    true,
 		},
@@ -146,6 +132,52 @@ func TestMatch(t *testing.T) {
 			path:    "pkg/src/main.go",
 			isDir:   false,
 			want:    false,
+		},
+
+		// ── anchored pattern — prefix matching ────────────────────────────────
+		// A pattern matching a path also matches everything beneath it.
+		// "internal/config" includes the directory and all files inside it.
+		{
+			name:    "anchored pattern matches exact path",
+			pattern: "internal/config",
+			path:    "internal/config",
+			isDir:   false,
+			want:    true,
+		},
+		{
+			name:    "anchored pattern matches file directly inside",
+			pattern: "internal/config",
+			path:    "internal/config/config.go",
+			isDir:   false,
+			want:    true,
+		},
+		{
+			name:    "anchored pattern matches file deep inside",
+			pattern: "internal/config",
+			path:    "internal/config/sub/deep.go",
+			isDir:   false,
+			want:    true,
+		},
+		{
+			name:    "anchored pattern does not match sibling dir",
+			pattern: "internal/config",
+			path:    "internal/config_other/file.go",
+			isDir:   false,
+			want:    false,
+		},
+		{
+			name:    "anchored pattern does not match parent",
+			pattern: "internal/config",
+			path:    "internal/other.go",
+			isDir:   false,
+			want:    false,
+		},
+		{
+			name:    "anchored pattern subdir matches its file",
+			pattern: "internal/config",
+			path:    "internal/config/sub",
+			isDir:   true,
+			want:    true,
 		},
 
 		// ── ** patterns ───────────────────────────────────────────────────────

@@ -41,28 +41,31 @@ func collect(c *config.Config, root string) ([]*Entry, error) {
 		}
 		relPath = filepath.ToSlash(relPath)
 
-		if !m.ShouldInclude(relPath, d.IsDir()) {
-			if d.IsDir() {
+		if d.IsDir() {
+			if !m.ShouldTraverse(relPath) {
 				return filepath.SkipDir
 			}
-			return nil
-		}
-
-		depth := pathDepth(path)
-
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-
-		if d.IsDir() {
+			depth := pathDepth(path)
 			if c.Depth >= 0 && depth >= c.Depth {
+				info, err := d.Info()
+				if err != nil {
+					return err
+				}
 				e := NewDir(path, relPath)
 				e.Size = info.Size()
 				entries = append(entries, e)
 				return filepath.SkipDir
 			}
 			return nil
+		}
+
+		if !m.ShouldInclude(relPath) {
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
 		}
 
 		e := NewFile(path, relPath)
