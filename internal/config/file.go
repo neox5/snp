@@ -19,6 +19,9 @@ func (c *Config) Save(path string) error {
 }
 
 func LoadConfig(p Params) (*Config, error) {
+	if p.NoConfig {
+		return p.ToConfig(), nil
+	}
 	fromFile, err := loadConfigFromSourceDir(p.SourceDir)
 	if err != nil {
 		return nil, err
