@@ -21,7 +21,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 # Result: ~40-50% size reduction
 LDFLAGS := -s -w -X '$(MODULE_PATH)/internal/version.Version=$(VERSION)'
 
-.PHONY: all build build-local clean test lint print-version release post-release
+.PHONY: all build build-local clean test lint print-version release post-release install
 
 all: build
 
@@ -77,6 +77,30 @@ release:
 
 post-release:
 	@./scripts/post-release.sh
+
+# ---------------------------------------------------------------------
+# Install published release binary to /usr/local/bin
+# ---------------------------------------------------------------------
+
+install:
+	@OS=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	ARCH=$$(uname -m); \
+	case "$$ARCH" in \
+		x86_64|amd64) ARCH=amd64 ;; \
+		arm64|aarch64) ARCH=arm64 ;; \
+		*) echo "unsupported ARCH: $$ARCH" >&2; exit 1 ;; \
+	esac; \
+	EXT=""; \
+	[ "$$OS" = "windows" ] && EXT=".exe"; \
+	FILE="$(BINARY)-$${OS}-$${ARCH}$${EXT}"; \
+	URL="https://github.com/neox5/snp/releases/latest/download/$$FILE"; \
+	TMP=$$(mktemp -d); \
+	trap 'rm -rf "$$TMP"' EXIT; \
+	echo "downloading $$URL"; \
+	curl -fL -o "$$TMP/$$FILE" "$$URL"; \
+	chmod +x "$$TMP/$$FILE"; \
+	sudo mv "$$TMP/$$FILE" /usr/local/bin/$(BINARY); \
+	$(BINARY) --version
 
 # ---------------------------------------------------------------------
 
