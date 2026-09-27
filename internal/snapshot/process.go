@@ -57,10 +57,16 @@ func (s *Snapshot) processFile(e *Entry) error {
 			return err
 		}
 	}
+	e.IsBinary = isBinary
 
 	// ### content processing
 	if isBinary {
 		e.Lines = []string{fmt.Sprintf("[Binary file - %s - content omitted]", formatSize(e.Size))}
+		return nil
+	}
+
+	if e.Size == 0 {
+		e.Lines = []string{"[Empty file]"}
 		return nil
 	}
 

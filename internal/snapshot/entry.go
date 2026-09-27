@@ -69,10 +69,14 @@ func checkForceOverride(path string, forceBinary, forceText []string) (isBinary 
 }
 
 // detectBinary reports whether a file is binary by sniffing its content.
+// An empty file (n == 0, io.EOF or nil error) is reported as not binary.
 func detectBinary(f *os.File) (bool, error) {
 	buf := make([]byte, 512)
 	n, err := f.Read(buf)
-	if err != nil && n == 0 {
+	if n == 0 {
+		if err == nil || err == io.EOF {
+			return false, nil
+		}
 		return false, err
 	}
 	if _, err := f.Seek(0, 0); err != nil {
