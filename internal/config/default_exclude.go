@@ -11,13 +11,17 @@ import (
 )
 
 var DefaultExcludePatterns = []string{
-	// VCS and dependencies
-	".git/",
-	"node_modules/",
-	".venv/",
-	"venv/",
-	"__pycache__/",
-	".pytest_cache/",
+	// VCS, dependencies and caches, at any depth.
+	// No trailing slash: a pattern with a trailing slash matches at the root only.
+	".git",
+	"node_modules",
+	".venv",
+	"venv",
+	"__pycache__",
+	".pytest_cache",
+
+	// Build output, root only: these names are also used by source packages
+	// (for example internal/build), so they must not match at depth.
 	"dist/",
 	"build/",
 	"target/",
@@ -52,11 +56,21 @@ func buildExcludeDefaultRules(srcDir string) matcher.Rules {
 		return nil
 	}
 	path := filepath.Join(srcDirAbs, ".gitignore")
-	patterns := append(DefaultExcludePatterns, loadGitignorePatterns(path)...)
 
 	r := matcher.NewRules()
-	for _, n := range patterns {
-		r = r.AddExclude(n)
+	for _, p := range DefaultExcludePatterns {
+		r = r.AddExclude(p)
+	}
+
+	// .gitignore lines use ScopeEntry (git semantics); "!pattern" re-includes.
+	for _, line := range loadGitignorePatterns(path) {
+		if p, negate := strings.CutPrefix(line, "!"); negate {
+			if p != "" {
+				r = r.AddIncludeEntry(p)
+			}
+			continue
+		}
+		r = r.AddExcludeEntry(line)
 	}
 	return r
 }

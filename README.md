@@ -81,6 +81,70 @@ snp --include-all --exclude "**/*_test.go" --include "internal/auth/auth_test.go
 snp --include-all
 ```
 
+### Rule order
+
+Files are selected by one ordered rule list. The **last matching rule wins**:
+
+1. Default exclude patterns (`snp --show-defaults`)
+2. `.gitignore` in the source directory, if present
+3. `--include`, `--exclude`, `--include-all` and `--exclude-all` in command-line order
+
+Flags therefore always override `.gitignore`.
+
+**`.gitignore`** is applied as git applies it:
+
+- `pattern` excludes, `!pattern` re-includes.
+- A line matches only the entry it names. `build/*` matches the direct children of `build`, `docs/**` matches what is inside `docs` but not `docs` itself, and `name/` matches directories only.
+- A file inside an excluded directory cannot be re-included by `.gitignore`. With `secrets/` and `!secrets/notes.md`, `notes.md` stays excluded.
+- `.gitignore` lines never widen traversal. `!.gitkeep` does not make snp enter a directory that is excluded.
+
+**`--include` and `--exclude`** patterns cover a matched directory together with its contents:
+
+```bash
+# .gitignore contains: secrets/
+snp --include secrets             # all files below secrets/
+snp --include secrets/notes.md    # only that file
+```
+
+| Pattern             | Matches                                                         |
+| ------------------- | --------------------------------------------------------------- |
+| `README.md`, `*.go` | files and directories with that name, at any depth              |
+| `internal/config`   | that path from the source directory, including everything below |
+| `/README.md`        | that name at the root only                                      |
+| `dir/`              | the directory `dir` at the root, including everything below it  |
+| `**/*_test.go`      | any depth                                                       |
+
+**Default excludes:** `.git`, `node_modules`, `.venv`, `venv`, `__pycache__` and `.pytest_cache` match at any depth. `dist/`, `build/`, `target/` and `vendor/` match at the root only, because these names are also used by source packages.
+
+**Not supported:** nested `.gitignore` files, `.git/info/exclude`, global git excludes, and a parent `.gitignore` when running in a subdirectory. In patterns: `[!a]`, POSIX character classes, backslash escapes and trailing-space rules.
+
+### Inspecting the rules
+
+`-vv` prints the rule list in evaluation order:
+
+```bash
+snp -vv --dry-run --include docs --exclude "**/*.tmp"
+```
+
+```text
+[Matcher Rules]
+  last match wins
+  rule  pattern           on a matching directory
+  [-]   .git              with contents
+  [-]   node_modules      with contents
+  ...
+  [-]   **/*.snp.txt      with contents
+  [-]   *                 itself only              (.gitignore)
+  [+]   automation/       itself only              (.gitignore)
+  [+]   automation/*.pub  itself only              (.gitignore)
+  [+]   .gitkeep          itself only              (.gitignore)
+  [+]   README.md         itself only              (.gitignore)
+  [+]   docs              with contents
+  [-]   **/*.tmp          with contents
+```
+
+`[+]` includes, `[-]` excludes. `with contents` covers a matched directory and everything below it. `itself only` matches the named entry only (`.gitignore` lines).
+
 **Depth control:**
 
 ```
