@@ -3,6 +3,7 @@ package matcher
 import (
 	"fmt"
 	"io"
+	"strings"
 )
 
 // RuleType defines the kind of rule.
@@ -48,6 +49,7 @@ type Rule struct {
 	Type    RuleType
 	Pattern string // only used for RuleInclude and RuleExclude
 	Scope   Scope  // zero value is ScopeSubtree
+	Source  string // display label of where the rule came from; never evaluated
 }
 
 type Rules []Rule
@@ -86,9 +88,24 @@ func (r Rules) AddIncludeEntry(p string) Rules {
 	return append(r, Rule{Type: RuleInclude, Pattern: p, Scope: ScopeEntry})
 }
 
+// WithSource returns a copy of r in which every rule without a source label
+// gets the given one.
+func (r Rules) WithSource(source string) Rules {
+	out := make(Rules, len(r))
+	for i, rule := range r {
+		if rule.Source == "" {
+			rule.Source = source
+		}
+		out[i] = rule
+	}
+	return out
+}
+
 // Print writes the rules in evaluation order, one per line. The last column
 // states what a rule does when its pattern matches a directory, which is the
-// only place ScopeSubtree and ScopeEntry behave differently.
+// only place ScopeSubtree and ScopeEntry behave differently. When any rule
+// carries a source label, a source column follows the pattern; otherwise
+// .gitignore rules are marked at the end of the line.
 func (r Rules) Print(w io.Writer, indent ...string) {
 	prefix := ""
 	if len(indent) > 0 {
@@ -97,35 +114,49 @@ func (r Rules) Print(w io.Writer, indent ...string) {
 
 	const (
 		patternHeader  = "pattern"
+		sourceHeader   = "source"
 		coverageHeader = "on a matching directory"
 	)
 
 	width := len(patternHeader)
+	sourceWidth := len(sourceHeader)
+	labelled := false
 	for _, rule := range r {
-		if len(rule.Pattern) > width {
-			width = len(rule.Pattern)
-		}
+		width = max(width, len(rule.Pattern))
+		sourceWidth = max(sourceWidth, len(rule.Source))
+		labelled = labelled || rule.Source != ""
 	}
 
 	fmt.Fprintf(w, "%slast match wins\n", prefix)
-	fmt.Fprintf(w, "%s%-6s%-*s  %s\n", prefix, "rule", width, patternHeader, coverageHeader)
+	if labelled {
+		fmt.Fprintf(w, "%s%-6s%-*s  %-*s  %s\n", prefix, "rule", width, patternHeader, sourceWidth, sourceHeader, coverageHeader)
+	} else {
+		fmt.Fprintf(w, "%s%-6s%-*s  %s\n", prefix, "rule", width, patternHeader, coverageHeader)
+	}
 
 	for _, rule := range r {
-		switch rule.Type {
-		case RuleIncludeAll:
-			fmt.Fprintf(w, "%s%-6sALL\n", prefix, "[+]")
-		case RuleExcludeAll:
-			fmt.Fprintf(w, "%s%-6sALL\n", prefix, "[-]")
-		case RuleInclude, RuleExclude:
-			sign := "[+]"
-			if rule.Type == RuleExclude {
-				sign = "[-]"
-			}
-			if rule.Scope == ScopeEntry {
-				fmt.Fprintf(w, "%s%-6s%-*s  %-*s  (.gitignore)\n", prefix, sign, width, rule.Pattern, len(coverageHeader), "itself only")
-				continue
-			}
-			fmt.Fprintf(w, "%s%-6s%-*s  with contents\n", prefix, sign, width, rule.Pattern)
+		sign := "[+]"
+		if rule.Type == RuleExclude || rule.Type == RuleExcludeAll {
+			sign = "[-]"
 		}
+
+		pattern, coverage := "ALL", ""
+		if rule.Type == RuleInclude || rule.Type == RuleExclude {
+			pattern, coverage = rule.Pattern, "with contents"
+			if rule.Scope == ScopeEntry {
+				coverage = "itself only"
+			}
+		}
+
+		var line string
+		switch {
+		case labelled:
+			line = fmt.Sprintf("%-6s%-*s  %-*s  %s", sign, width, pattern, sourceWidth, rule.Source, coverage)
+		case rule.Scope == ScopeEntry && coverage != "":
+			line = fmt.Sprintf("%-6s%-*s  %-*s  (.gitignore)", sign, width, pattern, len(coverageHeader), coverage)
+		default:
+			line = fmt.Sprintf("%-6s%-*s  %s", sign, width, pattern, coverage)
+		}
+		fmt.Fprintf(w, "%s%s\n", prefix, strings.TrimRight(line, " "))
 	}
 }

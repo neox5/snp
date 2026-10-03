@@ -23,6 +23,9 @@ const (
 	SourceDefault = "default"
 	SourceFile    = "file"
 	SourceCLI     = "cli"
+
+	// SourceGitignore labels matcher rules read from .gitignore.
+	SourceGitignore = ".gitignore"
 )
 
 // Source is a named layer. Sources are resolved lowest precedence first.

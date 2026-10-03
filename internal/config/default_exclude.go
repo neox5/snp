@@ -61,18 +61,20 @@ func buildExcludeDefaultRules(srcDir string) matcher.Rules {
 	for _, p := range DefaultExcludePatterns {
 		r = r.AddExclude(p)
 	}
+	r = r.WithSource(SourceDefault)
 
 	// .gitignore lines use ScopeEntry (git semantics); "!pattern" re-includes.
+	ignored := matcher.NewRules()
 	for _, line := range loadGitignorePatterns(path) {
 		if p, negate := strings.CutPrefix(line, "!"); negate {
 			if p != "" {
-				r = r.AddIncludeEntry(p)
+				ignored = ignored.AddIncludeEntry(p)
 			}
 			continue
 		}
-		r = r.AddExcludeEntry(line)
+		ignored = ignored.AddExcludeEntry(line)
 	}
-	return r
+	return r.AddRules(ignored.WithSource(SourceGitignore))
 }
 
 // loadGitignorePatterns reads a .gitignore file and returns non-empty, non-comment lines.

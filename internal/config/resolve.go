@@ -40,7 +40,10 @@ func fold(sources []Source) (Layer, Origins) {
 		o.setBool(&out.Silent, l.Silent, "silent", s.Name)
 
 		if len(l.MatcherFlags) > 0 {
-			out.MatcherFlags = append(out.MatcherFlags, l.MatcherFlags...)
+			for _, f := range l.MatcherFlags {
+				f.Source = s.Name
+				out.MatcherFlags = append(out.MatcherFlags, f)
+			}
 			o.addList("filter_flags", s.Name)
 		}
 		if len(l.PickPaths) > 0 {

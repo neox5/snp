@@ -25,7 +25,7 @@ func TestBuildExcludeDefaultRules_NoGitignore(t *testing.T) {
 		t.Fatalf("got %d rules, want %d default rules", len(rules), len(DefaultExcludePatterns))
 	}
 	for i, p := range DefaultExcludePatterns {
-		want := matcher.Rule{Type: matcher.RuleExclude, Pattern: p, Scope: matcher.ScopeSubtree}
+		want := matcher.Rule{Type: matcher.RuleExclude, Pattern: p, Scope: matcher.ScopeSubtree, Source: SourceDefault}
 		if rules[i] != want {
 			t.Errorf("rule %d = %+v, want %+v", i, rules[i], want)
 		}
@@ -40,10 +40,10 @@ func TestBuildExcludeDefaultRules_Gitignore(t *testing.T) {
 	n := len(DefaultExcludePatterns)
 
 	want := matcher.Rules{
-		{Type: matcher.RuleExclude, Pattern: "*", Scope: matcher.ScopeEntry},
-		{Type: matcher.RuleInclude, Pattern: "automation/", Scope: matcher.ScopeEntry},
-		{Type: matcher.RuleInclude, Pattern: ".gitkeep", Scope: matcher.ScopeEntry},
-		{Type: matcher.RuleExclude, Pattern: "build/*", Scope: matcher.ScopeEntry},
+		{Type: matcher.RuleExclude, Pattern: "*", Scope: matcher.ScopeEntry, Source: SourceGitignore},
+		{Type: matcher.RuleInclude, Pattern: "automation/", Scope: matcher.ScopeEntry, Source: SourceGitignore},
+		{Type: matcher.RuleInclude, Pattern: ".gitkeep", Scope: matcher.ScopeEntry, Source: SourceGitignore},
+		{Type: matcher.RuleExclude, Pattern: "build/*", Scope: matcher.ScopeEntry, Source: SourceGitignore},
 	}
 	if len(rules) != n+len(want) {
 		t.Fatalf("got %d rules, want %d", len(rules), n+len(want))

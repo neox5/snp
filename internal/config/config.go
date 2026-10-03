@@ -57,6 +57,9 @@ func FlagTypeFromString(s string) FlagType {
 type Flag struct {
 	Type  FlagType `json:"type"`
 	Value string   `json:"value"`
+	// Source names the layer the flag came from. It is set while resolving and
+	// never saved.
+	Source string `json:"-"`
 }
 
 func (f Flag) String() string {
@@ -101,19 +104,20 @@ func (c Config) BuildMatcherRules() matcher.Rules {
 	r := buildExcludeDefaultRules(c.SourceDir)
 
 	for _, f := range c.MatcherFlags {
+		var one matcher.Rules
 		switch f.Type {
 		case FlagTypeExcludeAll:
-			r = r.AddExcludeAll()
-			continue
+			one = matcher.NewRules().AddExcludeAll()
 		case FlagTypeIncludeAll:
-			r = r.AddIncludeAll()
-			continue
+			one = matcher.NewRules().AddIncludeAll()
 		case FlagTypeExclude:
-			r = r.AddExclude(f.Value)
-			continue
+			one = matcher.NewRules().AddExclude(f.Value)
 		case FlagTypeInclude:
-			r = r.AddInclude(f.Value)
+			one = matcher.NewRules().AddInclude(f.Value)
+		default:
+			continue
 		}
+		r = r.AddRules(one.WithSource(f.Source))
 	}
 
 	return r

@@ -104,11 +104,11 @@ func TestMatcherFlagsAppendInOrder(t *testing.T) {
 	res := load(t, dir, cliLayer(t,
 		occ("exclude", "*_test.go"), occ("include-all", "true"), occ("include-all", "false"), occ("include", "a,b")))
 	want := []Flag{
-		{FlagTypeExcludeAll, ""},
-		{FlagTypeInclude, "*.go"},
-		{FlagTypeExclude, "*_test.go"},
-		{FlagTypeIncludeAll, ""},
-		{FlagTypeInclude, "a,b"}, // include is not split on commas
+		{Type: FlagTypeExcludeAll, Source: SourceFile},
+		{Type: FlagTypeInclude, Value: "*.go", Source: SourceFile},
+		{Type: FlagTypeExclude, Value: "*_test.go", Source: SourceCLI},
+		{Type: FlagTypeIncludeAll, Source: SourceCLI},
+		{Type: FlagTypeInclude, Value: "a,b", Source: SourceCLI}, // include is not split on commas
 	}
 	if !reflect.DeepEqual(res.Config.MatcherFlags, want) {
 		t.Errorf("flags:\n got %v\nwant %v", res.Config.MatcherFlags, want)
@@ -225,6 +225,8 @@ func TestSaveRoundTrip(t *testing.T) {
 	second := load(t, dir, cliLayer(t))
 	a, b := *first.Config, *second.Config
 	a.Generated, b.Generated = time.Time{}, time.Time{}
+	// The same flag comes from the cli in one run and from the file in the other.
+	a.MatcherFlags, b.MatcherFlags = withoutSource(a.MatcherFlags), withoutSource(b.MatcherFlags)
 	if !reflect.DeepEqual(a, b) {
 		t.Errorf("round trip differs:\n%+v\n%+v", a, b)
 	}
@@ -248,4 +250,48 @@ func TestInvalidFileFails(t *testing.T) {
 	if _, err := Load(Params{SourceDir: dir}, Layer{}); err == nil {
 		t.Error("want error for invalid JSON")
 	}
+}
+
+// Matcher rules carry the layer they came from; the label is never saved.
+func TestMatcherRuleSources(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, `{"filter_flags":[{"type":"include","value":"*.go"}]}`)
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.tmp\n!keep.tmp\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res := load(t, dir, cliLayer(t, occ("exclude", "x")))
+
+	rules := res.Config.BuildMatcherRules()
+	n := len(DefaultExcludePatterns)
+	if len(rules) != n+4 {
+		t.Fatalf("got %d rules, want %d", len(rules), n+4)
+	}
+	for i, r := range rules[:n] {
+		if r.Source != SourceDefault {
+			t.Errorf("rule %d source = %q, want default", i, r.Source)
+		}
+	}
+	want := []string{SourceGitignore, SourceGitignore, SourceFile, SourceCLI}
+	for i, w := range want {
+		if got := rules[n+i].Source; got != w {
+			t.Errorf("rule %d source = %q, want %q", n+i, got, w)
+		}
+	}
+
+	if err := Save(dir, res.Persist); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, ConfigFileName))
+	if strings.Contains(string(data), "ource") {
+		t.Errorf("source label saved:\n%s", data)
+	}
+}
+
+func withoutSource(flags []Flag) []Flag {
+	out := make([]Flag, len(flags))
+	for i, f := range flags {
+		f.Source = ""
+		out[i] = f
+	}
+	return out
 }
