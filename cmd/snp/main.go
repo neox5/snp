@@ -7,11 +7,15 @@ import (
 
 	cli "github.com/urfave/cli/v3"
 
+	"github.com/neox5/snp/internal/clirec"
 	"github.com/neox5/snp/internal/config"
 	"github.com/neox5/snp/internal/version"
 )
 
-var verboseCount int
+var (
+	verboseCount int
+	recorder     clirec.Recorder
+)
 
 func init() {
 	cli.VersionFlag = &cli.BoolFlag{
@@ -37,7 +41,7 @@ Examples:
   snp ./myproject            # snapshot specific directory
   snp --dry-run              # list files without writing
   snp --pick go.mod go.sum   # include only specific files`,
-		Flags: []cli.Flag{
+		Flags: clirec.WrapUrfave(&recorder, []cli.Flag{
 			// Verbosity
 			&cli.BoolFlag{
 				Name:    "verbose",
@@ -156,7 +160,7 @@ Examples:
 				Name:  "show-config",
 				Usage: "Print current config and equivalent snp command, then exit",
 			},
-		},
+		}),
 		ArgsUsage: "[DIRECTORY]",
 		Action:    runAction,
 	}

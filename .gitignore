@@ -1,6 +1,9 @@
 # build folder
 dist
 
+# git patch
+*.patch
+
 # snapshot files & config
 **/*.snp
 **/*.snp.txt

@@ -7,32 +7,40 @@ import (
 )
 
 // Print writes a human-readable diagnostic representation of Config to stdout.
-func (c Config) Print(indent ...string) {
+// Settings that have an entry in origins are followed by their source.
+func (c Config) Print(origins Origins, indent ...string) {
 	prefix := ""
 	if len(indent) > 0 {
 		prefix = indent[0]
 	}
-	fmt.Printf("%sgenerated:     %s\n", prefix, func() string {
-		if c.Generated.IsZero() {
-			return "-"
+	line := func(key, label string, value any) {
+		suffix := ""
+		if src := origins[key]; src != "" {
+			suffix = "  (" + src + ")"
 		}
-		return c.Generated.Local().Format("2006-01-02 15:04:05")
-	}())
-	fmt.Printf("%ssource_dir:    %s\n", prefix, c.SourceDir)
-	fmt.Printf("%sdry_run:       %v\n", prefix, c.DryRun)
+		fmt.Printf("%s%-15s%v%s\n", prefix, label, value, suffix)
+	}
+
+	generated := "-"
+	if !c.Generated.IsZero() {
+		generated = c.Generated.Local().Format("2006-01-02 15:04:05")
+	}
+	line("", "generated:", generated)
+	line("", "source_dir:", c.SourceDir)
+	line("", "dry_run:", c.DryRun)
 	fmt.Println()
-	fmt.Printf("%sdepth:         %d\n", prefix, c.Depth)
-	fmt.Printf("%smatcher_flags: %s\n", prefix, c.MatcherFlags)
-	fmt.Printf("%spick_paths:    %v\n", prefix, c.PickPaths)
-	fmt.Printf("%sforce_text:    %v\n", prefix, c.ForceTextPatterns)
-	fmt.Printf("%sforce_binary:  %v\n", prefix, c.ForceBinaryPatterns)
-	fmt.Printf("%soutput:        %s\n", prefix, c.OutputPath)
-	fmt.Printf("%sno_summary:    %v\n", prefix, c.NoSummary)
-	fmt.Printf("%sno_index:      %v\n", prefix, c.NoIndex)
-	fmt.Printf("%sno_git_log:    %v\n", prefix, c.NoGitLog)
-	fmt.Printf("%sno_content:    %v\n", prefix, c.NoContent)
-	fmt.Printf("%sstdout:        %v\n", prefix, c.Stdout)
-	fmt.Printf("%ssilent:        %v\n", prefix, c.Silent)
+	line("depth", "depth:", c.Depth)
+	line("filter_flags", "matcher_flags:", c.MatcherFlags)
+	line("pick_paths", "pick_paths:", c.PickPaths)
+	line("force_text_patterns", "force_text:", c.ForceTextPatterns)
+	line("force_binary_patterns", "force_binary:", c.ForceBinaryPatterns)
+	line("output_path", "output:", c.OutputPath)
+	line("no_summary", "no_summary:", c.NoSummary)
+	line("no_index", "no_index:", c.NoIndex)
+	line("no_git_log", "no_git_log:", c.NoGitLog)
+	line("no_content", "no_content:", c.NoContent)
+	line("stdout", "stdout:", c.Stdout)
+	line("silent", "silent:", c.Silent)
 }
 
 // BuildCommand returns the equivalent CLI command string for cfg.

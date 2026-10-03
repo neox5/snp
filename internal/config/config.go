@@ -84,37 +84,6 @@ type Config struct {
 	Silent              bool      `json:"silent"`
 }
 
-// Merge merges other over c and returns a new Config instance
-func (c Config) Merge(other Config) *Config {
-	depth := other.Depth
-	if other.Depth == -1 {
-		depth = c.Depth
-	}
-
-	out := other.OutputPath
-	if other.OutputPath == "" {
-		out = c.OutputPath
-	}
-
-	return &Config{
-		Generated:           other.Generated,
-		SourceDir:           other.SourceDir,
-		Depth:               depth,
-		MatcherFlags:        append(c.MatcherFlags, other.MatcherFlags...),
-		PickPaths:           mergeUnique(c.PickPaths, other.PickPaths),
-		ForceTextPatterns:   mergeUnique(c.ForceTextPatterns, other.ForceTextPatterns),
-		ForceBinaryPatterns: mergeUnique(c.ForceBinaryPatterns, other.ForceBinaryPatterns),
-		OutputPath:          out,
-		NoSummary:           other.NoSummary,
-		NoIndex:             other.NoIndex,
-		NoGitLog:            other.NoGitLog,
-		NoContent:           other.NoContent,
-		Stdout:              other.Stdout,
-		DryRun:              other.DryRun,
-		Silent:              other.Silent,
-	}
-}
-
 func (c Config) Validate() error {
 	if len(c.MatcherFlags) > 0 && len(c.PickPaths) > 0 {
 		return fmt.Errorf("--pick cannot be combined with --include/exclude(-all)")
@@ -148,16 +117,4 @@ func (c Config) BuildMatcherRules() matcher.Rules {
 	}
 
 	return r
-}
-
-func mergeUnique(base, override []string) []string {
-	seen := make(map[string]bool)
-	var result []string
-	for _, v := range append(base, override...) {
-		if !seen[v] {
-			seen[v] = true
-			result = append(result, v)
-		}
-	}
-	return result
 }

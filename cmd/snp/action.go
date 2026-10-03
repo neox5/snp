@@ -20,28 +20,12 @@ func cliToParams(c *cli.Command) config.Params {
 	}
 
 	return config.Params{
-		SourceDir:           sourceDir,
-		Args:                os.Args[1:],
-		NoConfig:            c.Bool("no-config"),
-		SaveConfig:          c.Bool("save-config"),
-		ShowConfig:          c.Bool("show-config"),
-		DryRun:              c.Bool("dry-run"),
-		Depth:               c.Int("depth"),
-		PickPaths:           c.StringSlice("pick"),
-		ForceTextPatterns:   c.StringSlice("force-text"),
-		ForceBinaryPatterns: c.StringSlice("force-binary"),
-		OutputPath:          c.String("output"),
-		NoSummary:           c.Bool("no-summary"),
-		NoIndex:             c.Bool("no-index"),
-		NoGitLog:            c.Bool("no-git-log"),
-		NoContent:           c.Bool("no-content"),
-		OnlySummary:         c.Bool("only-summary"),
-		OnlyIndex:           c.Bool("only-index"),
-		OnlyGitLog:          c.Bool("only-git-log"),
-		OnlyContent:         c.Bool("only-content"),
-		Stdout:              c.Bool("stdout"),
-		Silent:              c.Bool("silent"),
-		VerboseLevel:        verboseCount,
+		SourceDir:    sourceDir,
+		NoConfig:     c.Bool("no-config"),
+		SaveConfig:   c.Bool("save-config"),
+		ShowConfig:   c.Bool("show-config"),
+		DryRun:       c.Bool("dry-run"),
+		VerboseLevel: verboseCount,
 	}
 }
 
@@ -52,20 +36,26 @@ func runAction(ctx context.Context, c *cli.Command) error {
 	}
 
 	p := cliToParams(c)
-	cfg, err := config.LoadConfig(p)
+	cliLayer, err := config.LayerFromOccurrences(recorder.Occurrences())
 	if err != nil {
 		return err
 	}
+
+	res, err := config.Load(p, cliLayer)
+	if err != nil {
+		return err
+	}
+	cfg := res.Config
 
 	if err = cfg.Validate(); err != nil {
 		return err
 	}
 
 	if p.SaveConfig {
-		if err = cfg.Save(p.SourceDir); err != nil {
+		if err = config.Save(p.SourceDir, res.Persist); err != nil {
 			return err
 		}
-		if !p.Silent {
+		if !cfg.Silent {
 			fmt.Printf("Saved config to %s\n", config.ConfigFileName)
 		}
 		return nil
@@ -86,7 +76,7 @@ func runAction(ctx context.Context, c *cli.Command) error {
 
 	if p.ShowConfig {
 		printHeader(true, "snp config")
-		cfg.Print("  ")
+		cfg.Print(res.Origins, "  ")
 		printHeader(false, "command")
 		fmt.Fprintln(status, cfg.BuildCommand())
 		return nil

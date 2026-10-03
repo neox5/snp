@@ -10,41 +10,27 @@ const (
 	ConfigFileName = ".snpconfig.json"
 )
 
-func (c *Config) Save(path string) error {
-	data, err := json.MarshalIndent(c, "", "  ")
+// Save writes the layer to the config file in dir. Only stated settings are
+// written, so defaults never end up in the file.
+func Save(dir string, l Layer) error {
+	data, err := json.MarshalIndent(l, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(path, ConfigFileName), data, 0o644)
+	return os.WriteFile(filepath.Join(dir, ConfigFileName), data, 0o644)
 }
 
-func LoadConfig(p Params) (*Config, error) {
-	if p.NoConfig {
-		return p.ToConfig(), nil
-	}
-	fromFile, err := loadConfigFromSourceDir(p.SourceDir)
-	if err != nil {
-		return nil, err
-	}
-	fromCli := p.ToConfig()
-	if fromFile == nil {
-		return fromCli, nil
-	}
-	return fromFile.Merge(*fromCli), nil
-}
-
-func loadConfigFromSourceDir(srcDir string) (*Config, error) {
-	path := filepath.Join(srcDir, ConfigFileName)
-	data, err := os.ReadFile(path)
+// loadLayer reads the config file in dir. found is false when there is none.
+func loadLayer(dir string) (l Layer, found bool, err error) {
+	data, err := os.ReadFile(filepath.Join(dir, ConfigFileName))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return Layer{}, false, nil
 		}
-		return nil, err
+		return Layer{}, false, err
 	}
-	var config Config
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
+	if err = json.Unmarshal(data, &l); err != nil {
+		return Layer{}, false, err
 	}
-	return &config, nil
+	return l, true, nil
 }
